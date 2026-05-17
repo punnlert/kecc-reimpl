@@ -56,3 +56,9 @@ impl WriteString for Initializer {
         todo!()
     }
 }
+fn write_indent(indent: usize, write: &mut dyn Write) -> Result<()> {
+    for _ in 0..indent {
+        write!(write, " ")?;
+    }
+    Ok(())
+}
