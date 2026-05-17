@@ -47,6 +47,10 @@ impl WriteLine for Declaration {
         Ok(())
     }
 }
+
+impl WriteLine for FunctionDefinition {
+    fn write_line(&self, indent: usize, write: &mut dyn Write) -> Result<()> {
+        write_indent(indent, write)?;
         todo!()
     }
 }
@@ -56,6 +60,13 @@ impl WriteString for Initializer {
         todo!()
     }
 }
+
+impl WriteString for Declaration {
+    fn write_string(&self) -> String {
+        todo!()
+    }
+}
+
 fn write_indent(indent: usize, write: &mut dyn Write) -> Result<()> {
     for _ in 0..indent {
         write!(write, " ")?;
