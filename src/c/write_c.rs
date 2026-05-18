@@ -4,6 +4,7 @@ use itertools::Itertools;
 use lang_c::ast::*;
 use lang_c::span::Node;
 
+use crate::ir::Declaration;
 use crate::write_base::*;
 
 impl<T: WriteLine> WriteLine for Node<T> {
@@ -52,7 +53,54 @@ impl WriteLine for Declaration {
 impl WriteLine for FunctionDefinition {
     fn write_line(&self, indent: usize, write: &mut dyn Write) -> Result<()> {
         write_indent(indent, write)?;
-        todo!()
+        writeln!(
+            write,
+            "{} {}",
+            self.specifiers.write_string(),
+            self.declarator.write_string()
+        )?;
+
+        for decl in &self.declarations {
+            decl.write_line(indent, write)?
+        }
+
+        write_indent(indent, write)?;
+        writeln!(write, "{{")?;
+
+        self.statement.write_line(indent + 1, write);
+
+        write_indent(indent, write)?;
+        writeln!(write, "}}")?;
+        Ok(())
+    }
+}
+
+impl WriteLine for Statement {
+    fn write_line(&self, indent: usize, write: &mut dyn Write) -> Result<()> {
+        write_indent(indent, write)?;
+        match self {
+            Statement::Compound(blocks) => {
+                todo!()
+            }
+            Statement::Expression(expr) => {
+                todo!()
+            }
+            Statement::If(node) => todo!(),
+            Statement::Switch(node) => todo!(),
+            Statement::While(node) => todo!(),
+            Statement::DoWhile(node) => todo!(),
+            Statement::For(node) => todo!(),
+            Statement::Continue => todo!(),
+            Statement::Break => todo!(),
+            Statement::Return(node) => todo!(),
+            _ => panic!("not supported"),
+        }
+    }
+}
+
+impl WriteString for Vec<Node<DeclarationSpecifier>> {
+    fn write_string(&self) -> String {
+        self.iter().map(WriteString::write_string).join(" ")
     }
 }
 
@@ -120,13 +168,13 @@ impl WriteString for FloatBase {
 
 impl WriteString for IntegerSize {
     fn write_string(&self) -> String {
-        todo!()
+        todo!("not important")
     }
 }
 
 impl WriteString for IntegerSuffix {
     fn write_string(&self) -> String {
-        assert!(!self.imaginary);
+        assert!(!self.imaginary, "can't be imaginary");
         format!(
             "{}{}",
             match self.size {
@@ -145,7 +193,7 @@ impl WriteString for IntegerSuffix {
 
 impl WriteString for FloatSuffix {
     fn write_string(&self) -> String {
-        assert!(!self.imaginary);
+        assert!(!self.imaginary, "can't be imaginary");
         format!(
             "{}",
             match self.format {
@@ -418,7 +466,74 @@ impl WriteString for InitDeclarator {
 
 impl WriteString for Declarator {
     fn write_string(&self) -> String {
-        todo!()
+        assert!(self.extensions.is_empty(), "extension should be empty");
+        let kind = match &self.kind.node {
+            DeclaratorKind::Abstract => "".to_string(),
+            DeclaratorKind::Identifier(id) => id.write_string(),
+            DeclaratorKind::Declarator(decl) => decl.write_string(),
+        };
+
+        let mut inner: String = kind.clone();
+
+        for der in self.derived.iter() {
+            let _ = match &der.node {
+                DerivedDeclarator::Pointer(pqs) => {
+                    let pointer = pqs
+                        .iter()
+                        .map(|pq| match &pq.node {
+                            PointerQualifier::TypeQualifier(typ) => typ.write_string(),
+                            _ => panic!("not supported"),
+                        })
+                        .join(" ");
+                    inner = format!("*{} {}", pointer, inner)
+                }
+                DerivedDeclarator::Array(arr) => {
+                    let typ = arr
+                        .node
+                        .qualifiers
+                        .iter()
+                        .map(WriteString::write_string)
+                        .join(" ");
+                    let size = match &arr.node.size {
+                        ArraySize::VariableExpression(expr) => expr.write_string(),
+                        _ => panic!("not supported"),
+                    };
+                    inner = format!("{} {}[{}]", typ, inner, size)
+                }
+                DerivedDeclarator::Function(fdec) => {
+                    assert_eq!(fdec.node.ellipsis, Ellipsis::None);
+                    let param = fdec
+                        .node
+                        .parameters
+                        .iter()
+                        .map(WriteString::write_string)
+                        .join(", ");
+                    inner = format!("{}({})", inner, param)
+                }
+                DerivedDeclarator::KRFunction(ids) => {
+                    let identifier = ids.iter().map(WriteString::write_string).join(",");
+                    inner = format!("{}({})", inner, identifier)
+                }
+                _ => panic!("unsupported"),
+            };
+        }
+        inner
+    }
+}
+
+impl WriteString for ParameterDeclaration {
+    fn write_string(&self) -> String {
+        assert!(self.extensions.is_empty(), "extension should be empty");
+        let specs = self
+            .specifiers
+            .iter()
+            .map(WriteString::write_string)
+            .join(" ");
+        if let Some(decl) = &self.declarator {
+            format!("{} {}", specs, decl.write_string())
+        } else {
+            specs
+        }
     }
 }
 
