@@ -4,7 +4,6 @@ use itertools::Itertools;
 use lang_c::ast::*;
 use lang_c::span::Node;
 
-use crate::ir::Declaration;
 use crate::write_base::*;
 
 impl<T: WriteLine> WriteLine for Node<T> {
@@ -64,35 +63,106 @@ impl WriteLine for FunctionDefinition {
             decl.write_line(indent, write)?
         }
 
-        write_indent(indent, write)?;
-        writeln!(write, "{{")?;
+        open_block(indent, write)?;
 
         self.statement.write_line(indent + 1, write);
 
-        write_indent(indent, write)?;
-        writeln!(write, "}}")?;
+        close_block(indent, write)?;
         Ok(())
     }
 }
 
 impl WriteLine for Statement {
     fn write_line(&self, indent: usize, write: &mut dyn Write) -> Result<()> {
-        write_indent(indent, write)?;
         match self {
             Statement::Compound(blocks) => {
-                todo!()
+                for block in blocks {
+                    match &block.node {
+                        BlockItem::Declaration(decl) => decl.write_line(indent, write)?,
+                        BlockItem::Statement(stmt) => stmt.write_line(indent, write)?,
+                        _ => panic!("not supported"),
+                    }
+                }
             }
             Statement::Expression(expr) => {
-                todo!()
+                write_indent(indent, write)?;
+                writeln!(write, "{};", expr.write_string())?
             }
-            Statement::If(node) => todo!(),
-            Statement::Switch(node) => todo!(),
-            Statement::While(node) => todo!(),
-            Statement::DoWhile(node) => todo!(),
-            Statement::For(node) => todo!(),
-            Statement::Continue => todo!(),
-            Statement::Break => todo!(),
-            Statement::Return(node) => todo!(),
+            Statement::If(stmt) => {
+                write_indent(indent, write)?;
+                let condition = stmt.node.condition.write_string();
+                writeln!(write, "if {}", condition)?;
+                open_block(indent, write)?;
+                stmt.node.then_statement.write_line(indent + 1, write)?;
+                close_block(indent, write)?;
+                if let Some(else_stmt) = &stmt.node.else_statement {
+                    write_indent(indent, write)?;
+                    writeln!(write, "else")?;
+                    open_block(indent, write)?;
+                    else_stmt.node.write_line(indent + 1, write)?;
+                    close_block(indent, write)?;
+                }
+            }
+            Statement::Switch(stmt) => {
+                write_indent(indent, write)?;
+                let expression = stmt.node.expression.write_string();
+                writeln!(write, "switch {}", expression)?;
+                open_block(indent, write)?;
+                stmt.node.statement.write_line(indent + 1, write)?;
+                close_block(indent, write)?;
+            }
+            Statement::While(stmt) => {
+                write_indent(indent, write)?;
+                let expression = stmt.node.expression.write_string();
+                writeln!(write, "while {}", expression)?;
+                open_block(indent, write)?;
+                stmt.node.statement.write_line(indent + 1, write)?;
+                close_block(indent, write)?;
+            }
+            Statement::DoWhile(stmt) => {
+                write_indent(indent, write)?;
+                let expression = stmt.node.expression.write_string();
+                writeln!(write, "do")?;
+                open_block(indent, write)?;
+                stmt.node.statement.write_line(indent + 1, write)?;
+                close_block(indent, write)?;
+                write_indent(indent, write)?;
+                writeln!(write, "while {}", expression)?;
+            }
+            Statement::For(stmt) => {
+                write_indent(indent, write)?;
+                let init = stmt.node.initializer.write_string();
+                let cond = stmt.node.condition.write_string();
+                let inc = stmt.node.step.write_string();
+                writeln!(write, "for ({};{};{})", init, cond, inc)?;
+                open_block(indent, write)?;
+                stmt.node.statement.write_line(indent + 1, write)?;
+                close_block(indent, write)?;
+            }
+            Statement::Continue => {
+                write_indent(indent, write)?;
+                writeln!(write, "continue;")?
+            }
+            Statement::Break => {
+                write_indent(indent, write)?;
+                writeln!(write, "break;")?
+            }
+            Statement::Return(expr) => {
+                write_indent(indent, write)?;
+                writeln!(write, "return {};", expr.write_string())?
+            }
+            _ => panic!("not supported"),
+        }
+        Ok(())
+    }
+}
+
+impl WriteString for ForInitializer {
+    fn write_string(&self) -> String {
+        match self {
+            ForInitializer::Empty => "".to_string(),
+            ForInitializer::Expression(expr) => expr.write_string(),
+            ForInitializer::Declaration(decl) => decl.write_string(),
             _ => panic!("not supported"),
         }
     }
@@ -194,15 +264,12 @@ impl WriteString for IntegerSuffix {
 impl WriteString for FloatSuffix {
     fn write_string(&self) -> String {
         assert!(!self.imaginary, "can't be imaginary");
-        format!(
-            "{}",
-            match self.format {
-                FloatFormat::Float => "",
-                FloatFormat::Double => "F",
-                FloatFormat::LongDouble => "L",
-                _ => panic!("not supported"),
-            }
-        )
+        match self.format {
+            FloatFormat::Float => "F".to_string(),
+            FloatFormat::Double => "".to_string(),
+            FloatFormat::LongDouble => "L".to_string(),
+            _ => panic!("not supported"),
+        }
     }
 }
 
@@ -215,7 +282,7 @@ impl WriteString for Expression {
                     format!(
                         "{}{}{}",
                         integer.base.write_string(),
-                        integer.number.to_string(),
+                        integer.number,
                         integer.suffix.write_string()
                     )
                 }
@@ -223,7 +290,7 @@ impl WriteString for Expression {
                     format!(
                         "{}{}{}",
                         float.base.write_string(),
-                        float.number.to_string(),
+                        float.number,
                         float.suffix.write_string()
                     )
                 }
@@ -335,7 +402,7 @@ impl WriteString for BinaryOperatorExpression {
             BinaryOperator::AssignBitwiseOr => "|=".to_string(),
         };
 
-        format!("{}{}{}", lhs, operator, rhs)
+        format!("({} {} {})", lhs, operator, rhs)
     }
 }
 
@@ -456,11 +523,15 @@ impl WriteString for TypeQualifier {
 
 impl WriteString for InitDeclarator {
     fn write_string(&self) -> String {
-        format!(
-            "{} {}",
-            self.declarator.write_string(),
-            self.initializer.write_string()
-        )
+        if let Some(init) = &self.initializer {
+            format!(
+                "{} = {}",
+                self.declarator.write_string(),
+                self.initializer.write_string()
+            )
+        } else {
+            self.declarator.write_string()
+        }
     }
 }
 
@@ -476,7 +547,7 @@ impl WriteString for Declarator {
         let mut inner: String = kind.clone();
 
         for der in self.derived.iter() {
-            let _ = match &der.node {
+            match &der.node {
                 DerivedDeclarator::Pointer(pqs) => {
                     let pointer = pqs
                         .iter()
@@ -538,8 +609,21 @@ impl WriteString for ParameterDeclaration {
 }
 
 fn write_indent(indent: usize, write: &mut dyn Write) -> Result<()> {
+    let size = "  ";
     for _ in 0..indent {
-        write!(write, " ")?;
+        write!(write, "{}", size)?;
     }
+    Ok(())
+}
+
+fn open_block(indent: usize, write: &mut dyn Write) -> Result<()> {
+    write_indent(indent, write)?;
+    writeln!(write, "{{")?;
+    Ok(())
+}
+
+fn close_block(indent: usize, write: &mut dyn Write) -> Result<()> {
+    write_indent(indent, write)?;
+    writeln!(write, "}}")?;
     Ok(())
 }

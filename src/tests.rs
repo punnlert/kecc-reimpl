@@ -85,11 +85,23 @@ pub fn test_write_c(path: &Path) {
     let temp_file_path = temp_dir.path().join("temp.c");
     let mut temp_file = File::create(&temp_file_path).unwrap();
 
+    let mut ori_file = File::create("temp/ori.txt").unwrap();
+    ori_file
+        .write_all(format!("{:#?}", unit).as_bytes())
+        .unwrap();
+    drop(ori_file);
+
     write(&unit, &mut temp_file).unwrap();
 
     let new_unit = Parse
         .translate(&temp_file_path.as_path())
         .expect("parse failed while parsing the output from implemented printer");
+
+    let mut new_file = File::create("temp/new.txt").unwrap();
+    new_file
+        .write_all(format!("{:#?}", new_unit).as_bytes())
+        .unwrap();
+    drop(new_file);
 
     if !unit.is_equiv(&new_unit) {
         let mut buf = String::new();

@@ -1,0 +1,839 @@
+TranslationUnit(
+    [
+        Node {
+            node: Declaration(
+                Node {
+                    node: Declaration {
+                        specifiers: [
+                            Node {
+                                node: TypeSpecifier(
+                                    Node {
+                                        node: Int,
+                                        span: 249…252,
+                                    },
+                                ),
+                                span: 249…252,
+                            },
+                        ],
+                        declarators: [
+                            Node {
+                                node: InitDeclarator {
+                                    declarator: Node {
+                                        node: Declarator {
+                                            kind: Node {
+                                                node: Identifier(
+                                                    Node {
+                                                        node: Identifier {
+                                                            name: "nonce",
+                                                        },
+                                                        span: 253…258,
+                                                    },
+                                                ),
+                                                span: 253…258,
+                                            },
+                                            derived: [],
+                                            extensions: [],
+                                        },
+                                        span: 253…259,
+                                    },
+                                    initializer: Some(
+                                        Node {
+                                            node: Expression(
+                                                Node {
+                                                    node: Constant(
+                                                        Node {
+                                                            node: Integer(
+                                                                Integer {
+                                                                    base: Decimal,
+                                                                    number: "1",
+                                                                    suffix: IntegerSuffix {
+                                                                        size: Int,
+                                                                        unsigned: false,
+                                                                        imaginary: false,
+                                                                    },
+                                                                },
+                                                            ),
+                                                            span: 261…262,
+                                                        },
+                                                    ),
+                                                    span: 261…262,
+                                                },
+                                            ),
+                                            span: 259…262,
+                                        },
+                                    ),
+                                },
+                                span: 253…262,
+                            },
+                        ],
+                    },
+                    span: 249…263,
+                },
+            ),
+            span: 249…263,
+        },
+        Node {
+            node: FunctionDefinition(
+                Node {
+                    node: FunctionDefinition {
+                        specifiers: [
+                            Node {
+                                node: TypeSpecifier(
+                                    Node {
+                                        node: Int,
+                                        span: 265…268,
+                                    },
+                                ),
+                                span: 265…268,
+                            },
+                        ],
+                        declarator: Node {
+                            node: Declarator {
+                                kind: Node {
+                                    node: Identifier(
+                                        Node {
+                                            node: Identifier {
+                                                name: "foo",
+                                            },
+                                            span: 269…272,
+                                        },
+                                    ),
+                                    span: 269…272,
+                                },
+                                derived: [
+                                    Node {
+                                        node: KRFunction(
+                                            [],
+                                        ),
+                                        span: 272…274,
+                                    },
+                                ],
+                                extensions: [],
+                            },
+                            span: 269…274,
+                        },
+                        declarations: [],
+                        statement: Node {
+                            node: Compound(
+                                [
+                                    Node {
+                                        node: Declaration(
+                                            Node {
+                                                node: Declaration {
+                                                    specifiers: [
+                                                        Node {
+                                                            node: TypeSpecifier(
+                                                                Node {
+                                                                    node: Int,
+                                                                    span: 279…282,
+                                                                },
+                                                            ),
+                                                            span: 279…282,
+                                                        },
+                                                    ],
+                                                    declarators: [
+                                                        Node {
+                                                            node: InitDeclarator {
+                                                                declarator: Node {
+                                                                    node: Declarator {
+                                                                        kind: Node {
+                                                                            node: Identifier(
+                                                                                Node {
+                                                                                    node: Identifier {
+                                                                                        name: "sum",
+                                                                                    },
+                                                                                    span: 283…286,
+                                                                                },
+                                                                            ),
+                                                                            span: 283…286,
+                                                                        },
+                                                                        derived: [],
+                                                                        extensions: [],
+                                                                    },
+                                                                    span: 283…287,
+                                                                },
+                                                                initializer: Some(
+                                                                    Node {
+                                                                        node: Expression(
+                                                                            Node {
+                                                                                node: Constant(
+                                                                                    Node {
+                                                                                        node: Integer(
+                                                                                            Integer {
+                                                                                                base: Decimal,
+                                                                                                number: "0",
+                                                                                                suffix: IntegerSuffix {
+                                                                                                    size: Int,
+                                                                                                    unsigned: false,
+                                                                                                    imaginary: false,
+                                                                                                },
+                                                                                            },
+                                                                                        ),
+                                                                                        span: 289…290,
+                                                                                    },
+                                                                                ),
+                                                                                span: 289…290,
+                                                                            },
+                                                                        ),
+                                                                        span: 287…290,
+                                                                    },
+                                                                ),
+                                                            },
+                                                            span: 283…290,
+                                                        },
+                                                    ],
+                                                },
+                                                span: 279…291,
+                                            },
+                                        ),
+                                        span: 279…291,
+                                    },
+                                    Node {
+                                        node: Declaration(
+                                            Node {
+                                                node: Declaration {
+                                                    specifiers: [
+                                                        Node {
+                                                            node: TypeSpecifier(
+                                                                Node {
+                                                                    node: Int,
+                                                                    span: 294…297,
+                                                                },
+                                                            ),
+                                                            span: 294…297,
+                                                        },
+                                                    ],
+                                                    declarators: [
+                                                        Node {
+                                                            node: InitDeclarator {
+                                                                declarator: Node {
+                                                                    node: Declarator {
+                                                                        kind: Node {
+                                                                            node: Identifier(
+                                                                                Node {
+                                                                                    node: Identifier {
+                                                                                        name: "i",
+                                                                                    },
+                                                                                    span: 298…299,
+                                                                                },
+                                                                            ),
+                                                                            span: 298…299,
+                                                                        },
+                                                                        derived: [],
+                                                                        extensions: [],
+                                                                    },
+                                                                    span: 298…300,
+                                                                },
+                                                                initializer: Some(
+                                                                    Node {
+                                                                        node: Expression(
+                                                                            Node {
+                                                                                node: Constant(
+                                                                                    Node {
+                                                                                        node: Integer(
+                                                                                            Integer {
+                                                                                                base: Decimal,
+                                                                                                number: "0",
+                                                                                                suffix: IntegerSuffix {
+                                                                                                    size: Int,
+                                                                                                    unsigned: false,
+                                                                                                    imaginary: false,
+                                                                                                },
+                                                                                            },
+                                                                                        ),
+                                                                                        span: 302…303,
+                                                                                    },
+                                                                                ),
+                                                                                span: 302…303,
+                                                                            },
+                                                                        ),
+                                                                        span: 300…303,
+                                                                    },
+                                                                ),
+                                                            },
+                                                            span: 298…303,
+                                                        },
+                                                    ],
+                                                },
+                                                span: 294…304,
+                                            },
+                                        ),
+                                        span: 294…304,
+                                    },
+                                    Node {
+                                        node: Declaration(
+                                            Node {
+                                                node: Declaration {
+                                                    specifiers: [
+                                                        Node {
+                                                            node: TypeSpecifier(
+                                                                Node {
+                                                                    node: Int,
+                                                                    span: 307…310,
+                                                                },
+                                                            ),
+                                                            span: 307…310,
+                                                        },
+                                                    ],
+                                                    declarators: [
+                                                        Node {
+                                                            node: InitDeclarator {
+                                                                declarator: Node {
+                                                                    node: Declarator {
+                                                                        kind: Node {
+                                                                            node: Identifier(
+                                                                                Node {
+                                                                                    node: Identifier {
+                                                                                        name: "continue_num",
+                                                                                    },
+                                                                                    span: 311…323,
+                                                                                },
+                                                                            ),
+                                                                            span: 311…323,
+                                                                        },
+                                                                        derived: [],
+                                                                        extensions: [],
+                                                                    },
+                                                                    span: 311…324,
+                                                                },
+                                                                initializer: Some(
+                                                                    Node {
+                                                                        node: Expression(
+                                                                            Node {
+                                                                                node: BinaryOperator(
+                                                                                    Node {
+                                                                                        node: BinaryOperatorExpression {
+                                                                                            operator: Node {
+                                                                                                node: Modulo,
+                                                                                                span: 333…334,
+                                                                                            },
+                                                                                            lhs: Node {
+                                                                                                node: Identifier(
+                                                                                                    Node {
+                                                                                                        node: Identifier {
+                                                                                                            name: "nonce",
+                                                                                                        },
+                                                                                                        span: 327…332,
+                                                                                                    },
+                                                                                                ),
+                                                                                                span: 327…333,
+                                                                                            },
+                                                                                            rhs: Node {
+                                                                                                node: Constant(
+                                                                                                    Node {
+                                                                                                        node: Integer(
+                                                                                                            Integer {
+                                                                                                                base: Decimal,
+                                                                                                                number: "98",
+                                                                                                                suffix: IntegerSuffix {
+                                                                                                                    size: Int,
+                                                                                                                    unsigned: false,
+                                                                                                                    imaginary: false,
+                                                                                                                },
+                                                                                                            },
+                                                                                                        ),
+                                                                                                        span: 335…337,
+                                                                                                    },
+                                                                                                ),
+                                                                                                span: 335…337,
+                                                                                            },
+                                                                                        },
+                                                                                        span: 327…337,
+                                                                                    },
+                                                                                ),
+                                                                                span: 326…338,
+                                                                            },
+                                                                        ),
+                                                                        span: 324…338,
+                                                                    },
+                                                                ),
+                                                            },
+                                                            span: 311…338,
+                                                        },
+                                                    ],
+                                                },
+                                                span: 307…339,
+                                            },
+                                        ),
+                                        span: 307…339,
+                                    },
+                                    Node {
+                                        node: Statement(
+                                            Node {
+                                                node: While(
+                                                    Node {
+                                                        node: WhileStatement {
+                                                            expression: Node {
+                                                                node: BinaryOperator(
+                                                                    Node {
+                                                                        node: BinaryOperatorExpression {
+                                                                            operator: Node {
+                                                                                node: Less,
+                                                                                span: 351…352,
+                                                                            },
+                                                                            lhs: Node {
+                                                                                node: Identifier(
+                                                                                    Node {
+                                                                                        node: Identifier {
+                                                                                            name: "i",
+                                                                                        },
+                                                                                        span: 349…350,
+                                                                                    },
+                                                                                ),
+                                                                                span: 349…351,
+                                                                            },
+                                                                            rhs: Node {
+                                                                                node: Constant(
+                                                                                    Node {
+                                                                                        node: Integer(
+                                                                                            Integer {
+                                                                                                base: Decimal,
+                                                                                                number: "100",
+                                                                                                suffix: IntegerSuffix {
+                                                                                                    size: Int,
+                                                                                                    unsigned: false,
+                                                                                                    imaginary: false,
+                                                                                                },
+                                                                                            },
+                                                                                        ),
+                                                                                        span: 353…356,
+                                                                                    },
+                                                                                ),
+                                                                                span: 353…356,
+                                                                            },
+                                                                        },
+                                                                        span: 349…356,
+                                                                    },
+                                                                ),
+                                                                span: 349…356,
+                                                            },
+                                                            statement: Node {
+                                                                node: Compound(
+                                                                    [
+                                                                        Node {
+                                                                            node: Statement(
+                                                                                Node {
+                                                                                    node: If(
+                                                                                        Node {
+                                                                                            node: IfStatement {
+                                                                                                condition: Node {
+                                                                                                    node: BinaryOperator(
+                                                                                                        Node {
+                                                                                                            node: BinaryOperatorExpression {
+                                                                                                                operator: Node {
+                                                                                                                    node: Equals,
+                                                                                                                    span: 372…374,
+                                                                                                                },
+                                                                                                                lhs: Node {
+                                                                                                                    node: Identifier(
+                                                                                                                        Node {
+                                                                                                                            node: Identifier {
+                                                                                                                                name: "i",
+                                                                                                                            },
+                                                                                                                            span: 370…371,
+                                                                                                                        },
+                                                                                                                    ),
+                                                                                                                    span: 370…372,
+                                                                                                                },
+                                                                                                                rhs: Node {
+                                                                                                                    node: Identifier(
+                                                                                                                        Node {
+                                                                                                                            node: Identifier {
+                                                                                                                                name: "continue_num",
+                                                                                                                            },
+                                                                                                                            span: 375…387,
+                                                                                                                        },
+                                                                                                                    ),
+                                                                                                                    span: 375…387,
+                                                                                                                },
+                                                                                                            },
+                                                                                                            span: 370…387,
+                                                                                                        },
+                                                                                                    ),
+                                                                                                    span: 370…387,
+                                                                                                },
+                                                                                                then_statement: Node {
+                                                                                                    node: Compound(
+                                                                                                        [
+                                                                                                            Node {
+                                                                                                                node: Statement(
+                                                                                                                    Node {
+                                                                                                                        node: Expression(
+                                                                                                                            Some(
+                                                                                                                                Node {
+                                                                                                                                    node: UnaryOperator(
+                                                                                                                                        Node {
+                                                                                                                                            node: UnaryOperatorExpression {
+                                                                                                                                                operator: Node {
+                                                                                                                                                    node: PostIncrement,
+                                                                                                                                                    span: 402…404,
+                                                                                                                                                },
+                                                                                                                                                operand: Node {
+                                                                                                                                                    node: Identifier(
+                                                                                                                                                        Node {
+                                                                                                                                                            node: Identifier {
+                                                                                                                                                                name: "i",
+                                                                                                                                                            },
+                                                                                                                                                            span: 401…402,
+                                                                                                                                                        },
+                                                                                                                                                    ),
+                                                                                                                                                    span: 401…402,
+                                                                                                                                                },
+                                                                                                                                            },
+                                                                                                                                            span: 401…404,
+                                                                                                                                        },
+                                                                                                                                    ),
+                                                                                                                                    span: 401…404,
+                                                                                                                                },
+                                                                                                                            ),
+                                                                                                                        ),
+                                                                                                                        span: 401…405,
+                                                                                                                    },
+                                                                                                                ),
+                                                                                                                span: 401…405,
+                                                                                                            },
+                                                                                                            Node {
+                                                                                                                node: Statement(
+                                                                                                                    Node {
+                                                                                                                        node: Continue,
+                                                                                                                        span: 412…421,
+                                                                                                                    },
+                                                                                                                ),
+                                                                                                                span: 412…421,
+                                                                                                            },
+                                                                                                        ],
+                                                                                                    ),
+                                                                                                    span: 393…427,
+                                                                                                },
+                                                                                                else_statement: None,
+                                                                                            },
+                                                                                            span: 366…432,
+                                                                                        },
+                                                                                    ),
+                                                                                    span: 366…432,
+                                                                                },
+                                                                            ),
+                                                                            span: 366…432,
+                                                                        },
+                                                                        Node {
+                                                                            node: Statement(
+                                                                                Node {
+                                                                                    node: Expression(
+                                                                                        Some(
+                                                                                            Node {
+                                                                                                node: BinaryOperator(
+                                                                                                    Node {
+                                                                                                        node: BinaryOperatorExpression {
+                                                                                                            operator: Node {
+                                                                                                                node: AssignPlus,
+                                                                                                                span: 437…439,
+                                                                                                            },
+                                                                                                            lhs: Node {
+                                                                                                                node: Identifier(
+                                                                                                                    Node {
+                                                                                                                        node: Identifier {
+                                                                                                                            name: "sum",
+                                                                                                                        },
+                                                                                                                        span: 433…436,
+                                                                                                                    },
+                                                                                                                ),
+                                                                                                                span: 433…437,
+                                                                                                            },
+                                                                                                            rhs: Node {
+                                                                                                                node: Identifier(
+                                                                                                                    Node {
+                                                                                                                        node: Identifier {
+                                                                                                                            name: "i",
+                                                                                                                        },
+                                                                                                                        span: 440…441,
+                                                                                                                    },
+                                                                                                                ),
+                                                                                                                span: 440…441,
+                                                                                                            },
+                                                                                                        },
+                                                                                                        span: 433…441,
+                                                                                                    },
+                                                                                                ),
+                                                                                                span: 432…442,
+                                                                                            },
+                                                                                        ),
+                                                                                    ),
+                                                                                    span: 432…443,
+                                                                                },
+                                                                            ),
+                                                                            span: 432…443,
+                                                                        },
+                                                                        Node {
+                                                                            node: Statement(
+                                                                                Node {
+                                                                                    node: Expression(
+                                                                                        Some(
+                                                                                            Node {
+                                                                                                node: UnaryOperator(
+                                                                                                    Node {
+                                                                                                        node: UnaryOperatorExpression {
+                                                                                                            operator: Node {
+                                                                                                                node: PostIncrement,
+                                                                                                                span: 449…451,
+                                                                                                            },
+                                                                                                            operand: Node {
+                                                                                                                node: Identifier(
+                                                                                                                    Node {
+                                                                                                                        node: Identifier {
+                                                                                                                            name: "i",
+                                                                                                                        },
+                                                                                                                        span: 448…449,
+                                                                                                                    },
+                                                                                                                ),
+                                                                                                                span: 448…449,
+                                                                                                            },
+                                                                                                        },
+                                                                                                        span: 448…451,
+                                                                                                    },
+                                                                                                ),
+                                                                                                span: 448…451,
+                                                                                            },
+                                                                                        ),
+                                                                                    ),
+                                                                                    span: 448…452,
+                                                                                },
+                                                                            ),
+                                                                            span: 448…452,
+                                                                        },
+                                                                        Node {
+                                                                            node: Statement(
+                                                                                Node {
+                                                                                    node: If(
+                                                                                        Node {
+                                                                                            node: IfStatement {
+                                                                                                condition: Node {
+                                                                                                    node: BinaryOperator(
+                                                                                                        Node {
+                                                                                                            node: BinaryOperatorExpression {
+                                                                                                                operator: Node {
+                                                                                                                    node: Equals,
+                                                                                                                    span: 463…465,
+                                                                                                                },
+                                                                                                                lhs: Node {
+                                                                                                                    node: Identifier(
+                                                                                                                        Node {
+                                                                                                                            node: Identifier {
+                                                                                                                                name: "i",
+                                                                                                                            },
+                                                                                                                            span: 461…462,
+                                                                                                                        },
+                                                                                                                    ),
+                                                                                                                    span: 461…463,
+                                                                                                                },
+                                                                                                                rhs: Node {
+                                                                                                                    node: BinaryOperator(
+                                                                                                                        Node {
+                                                                                                                            node: BinaryOperatorExpression {
+                                                                                                                                operator: Node {
+                                                                                                                                    node: Plus,
+                                                                                                                                    span: 480…481,
+                                                                                                                                },
+                                                                                                                                lhs: Node {
+                                                                                                                                    node: Identifier(
+                                                                                                                                        Node {
+                                                                                                                                            node: Identifier {
+                                                                                                                                                name: "continue_num",
+                                                                                                                                            },
+                                                                                                                                            span: 467…479,
+                                                                                                                                        },
+                                                                                                                                    ),
+                                                                                                                                    span: 467…480,
+                                                                                                                                },
+                                                                                                                                rhs: Node {
+                                                                                                                                    node: Constant(
+                                                                                                                                        Node {
+                                                                                                                                            node: Integer(
+                                                                                                                                                Integer {
+                                                                                                                                                    base: Decimal,
+                                                                                                                                                    number: "2",
+                                                                                                                                                    suffix: IntegerSuffix {
+                                                                                                                                                        size: Int,
+                                                                                                                                                        unsigned: false,
+                                                                                                                                                        imaginary: false,
+                                                                                                                                                    },
+                                                                                                                                                },
+                                                                                                                                            ),
+                                                                                                                                            span: 482…483,
+                                                                                                                                        },
+                                                                                                                                    ),
+                                                                                                                                    span: 482…483,
+                                                                                                                                },
+                                                                                                                            },
+                                                                                                                            span: 467…483,
+                                                                                                                        },
+                                                                                                                    ),
+                                                                                                                    span: 466…484,
+                                                                                                                },
+                                                                                                            },
+                                                                                                            span: 461…484,
+                                                                                                        },
+                                                                                                    ),
+                                                                                                    span: 461…484,
+                                                                                                },
+                                                                                                then_statement: Node {
+                                                                                                    node: Compound(
+                                                                                                        [
+                                                                                                            Node {
+                                                                                                                node: Statement(
+                                                                                                                    Node {
+                                                                                                                        node: Break,
+                                                                                                                        span: 498…504,
+                                                                                                                    },
+                                                                                                                ),
+                                                                                                                span: 498…504,
+                                                                                                            },
+                                                                                                        ],
+                                                                                                    ),
+                                                                                                    span: 490…510,
+                                                                                                },
+                                                                                                else_statement: None,
+                                                                                            },
+                                                                                            span: 457…513,
+                                                                                        },
+                                                                                    ),
+                                                                                    span: 457…513,
+                                                                                },
+                                                                            ),
+                                                                            span: 457…513,
+                                                                        },
+                                                                    ],
+                                                                ),
+                                                                span: 360…514,
+                                                            },
+                                                        },
+                                                        span: 342…514,
+                                                    },
+                                                ),
+                                                span: 342…514,
+                                            },
+                                        ),
+                                        span: 342…514,
+                                    },
+                                    Node {
+                                        node: Statement(
+                                            Node {
+                                                node: Return(
+                                                    Some(
+                                                        Node {
+                                                            node: Identifier(
+                                                                Node {
+                                                                    node: Identifier {
+                                                                        name: "sum",
+                                                                    },
+                                                                    span: 524…527,
+                                                                },
+                                                            ),
+                                                            span: 524…527,
+                                                        },
+                                                    ),
+                                                ),
+                                                span: 517…528,
+                                            },
+                                        ),
+                                        span: 517…528,
+                                    },
+                                ],
+                            ),
+                            span: 275…530,
+                        },
+                    },
+                    span: 265…530,
+                },
+            ),
+            span: 265…530,
+        },
+        Node {
+            node: FunctionDefinition(
+                Node {
+                    node: FunctionDefinition {
+                        specifiers: [
+                            Node {
+                                node: TypeSpecifier(
+                                    Node {
+                                        node: Int,
+                                        span: 532…535,
+                                    },
+                                ),
+                                span: 532…535,
+                            },
+                        ],
+                        declarator: Node {
+                            node: Declarator {
+                                kind: Node {
+                                    node: Identifier(
+                                        Node {
+                                            node: Identifier {
+                                                name: "main",
+                                            },
+                                            span: 536…540,
+                                        },
+                                    ),
+                                    span: 536…540,
+                                },
+                                derived: [
+                                    Node {
+                                        node: KRFunction(
+                                            [],
+                                        ),
+                                        span: 540…542,
+                                    },
+                                ],
+                                extensions: [],
+                            },
+                            span: 536…542,
+                        },
+                        declarations: [],
+                        statement: Node {
+                            node: Compound(
+                                [
+                                    Node {
+                                        node: Statement(
+                                            Node {
+                                                node: Return(
+                                                    Some(
+                                                        Node {
+                                                            node: Call(
+                                                                Node {
+                                                                    node: CallExpression {
+                                                                        callee: Node {
+                                                                            node: Identifier(
+                                                                                Node {
+                                                                                    node: Identifier {
+                                                                                        name: "foo",
+                                                                                    },
+                                                                                    span: 554…557,
+                                                                                },
+                                                                            ),
+                                                                            span: 554…557,
+                                                                        },
+                                                                        arguments: [],
+                                                                    },
+                                                                    span: 554…559,
+                                                                },
+                                                            ),
+                                                            span: 554…559,
+                                                        },
+                                                    ),
+                                                ),
+                                                span: 547…560,
+                                            },
+                                        ),
+                                        span: 547…560,
+                                    },
+                                ],
+                            ),
+                            span: 543…562,
+                        },
+                    },
+                    span: 532…562,
+                },
+            ),
+            span: 532…562,
+        },
+    ],
+)
