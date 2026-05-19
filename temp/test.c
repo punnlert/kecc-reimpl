@@ -1,29 +1,20 @@
-int nonce = 1;
-
-int foo()
+int foo(int i, int j, int k)
 {
-  int sum = 0;
-  int i = 0;
-  int continue_num = (nonce % 98);
-  while (i < 100)
-  {
-    if (i == continue_num)
-    {
-      i++;
-      continue;
-    }
-    (sum += i);
-    i++;
-    if (i == (continue_num + 2))
-    {
-      break;
-    }
-  }
-  return sum;
+  return ((i + j) + k);
+}
+
+int(* foo2())(int, int, int)
+{
+  return foo;
+}
+
+int(*(* foo3())())(int, int, int)
+{
+  return foo2;
 }
 
 int main()
 {
-  return foo();
+  return (foo3()()(2, 2, 2) == 6);
 }
 

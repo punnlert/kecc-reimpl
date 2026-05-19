@@ -54,7 +54,7 @@ impl WriteLine for FunctionDefinition {
         write_indent(indent, write)?;
         writeln!(
             write,
-            "{} {}",
+            "{}{}",
             self.specifiers.write_string(),
             self.declarator.write_string()
         )?;
@@ -91,22 +91,37 @@ impl WriteLine for Statement {
             Statement::If(stmt) => {
                 write_indent(indent, write)?;
                 let condition = stmt.node.condition.write_string();
-                writeln!(write, "if {}", condition)?;
-                open_block(indent, write)?;
-                stmt.node.then_statement.write_line(indent + 1, write)?;
-                close_block(indent, write)?;
+                writeln!(write, "if ({})", condition)?;
+                match &stmt.node.then_statement.node {
+                    Statement::Compound(_) => {
+                        open_block(indent, write)?;
+                        stmt.node.then_statement.write_line(indent + 1, write)?;
+                        close_block(indent, write)?;
+                    }
+                    _ => {
+                        stmt.node.then_statement.write_line(indent + 1, write)?;
+                    }
+                }
                 if let Some(else_stmt) = &stmt.node.else_statement {
                     write_indent(indent, write)?;
                     writeln!(write, "else")?;
-                    open_block(indent, write)?;
-                    else_stmt.node.write_line(indent + 1, write)?;
-                    close_block(indent, write)?;
+
+                    match &else_stmt.node {
+                        Statement::Compound(_) => {
+                            open_block(indent, write)?;
+                            else_stmt.write_line(indent + 1, write)?;
+                            close_block(indent, write)?;
+                        }
+                        _ => {
+                            else_stmt.write_line(indent + 1, write)?;
+                        }
+                    }
                 }
             }
             Statement::Switch(stmt) => {
                 write_indent(indent, write)?;
                 let expression = stmt.node.expression.write_string();
-                writeln!(write, "switch {}", expression)?;
+                writeln!(write, "switch ( {} )", expression)?;
                 open_block(indent, write)?;
                 stmt.node.statement.write_line(indent + 1, write)?;
                 close_block(indent, write)?;
@@ -127,7 +142,7 @@ impl WriteLine for Statement {
                 stmt.node.statement.write_line(indent + 1, write)?;
                 close_block(indent, write)?;
                 write_indent(indent, write)?;
-                writeln!(write, "while {}", expression)?;
+                writeln!(write, "while {};", expression)?;
             }
             Statement::For(stmt) => {
                 write_indent(indent, write)?;
@@ -150,6 +165,19 @@ impl WriteLine for Statement {
             Statement::Return(expr) => {
                 write_indent(indent, write)?;
                 writeln!(write, "return {};", expr.write_string())?
+            }
+            Statement::Labeled(stmt) => {
+                write_indent(indent, write)?;
+                match &stmt.node.label.node {
+                    Label::Case(expr) => {
+                        writeln!(write, "case {}:", expr.write_string())?;
+                    }
+                    Label::Default => writeln!(write, "default:")?,
+                    _ => panic!("not supported"),
+                }
+                open_block(indent, write)?;
+                stmt.node.statement.write_line(indent + 1, write)?;
+                close_block(indent, write)?;
             }
             _ => panic!("not supported"),
         }
@@ -345,7 +373,7 @@ impl WriteString for Expression {
             Expression::Conditional(expr) => {
                 let cond = expr.node.clone();
                 format!(
-                    "{} ? {} : {}",
+                    "({} ? {} : {})",
                     cond.condition.write_string(),
                     cond.then_expression.write_string(),
                     cond.else_expression.write_string()
@@ -461,7 +489,7 @@ impl WriteString for Identifier {
 impl WriteString for Declaration {
     fn write_string(&self) -> String {
         format!(
-            "{} {}",
+            "{}{}",
             self.specifiers
                 .iter()
                 .map(WriteString::write_string)
@@ -471,7 +499,7 @@ impl WriteString for Declaration {
                 .iter()
                 .map(WriteString::write_string)
                 .collect_vec()
-                .join(" "),
+                .join(", "),
         )
     }
 }
@@ -507,7 +535,59 @@ impl WriteString for TypeSpecifier {
             TypeSpecifier::Signed => "signed".to_string(),
             TypeSpecifier::Unsigned => "unsigned".to_string(),
             TypeSpecifier::Bool => "_Bool".to_string(),
+            TypeSpecifier::Struct(st) => st.write_string(),
+            TypeSpecifier::TypedefName(name) => name.node.write_string(),
             _ => panic!("not supported"),
+        }
+    }
+}
+
+impl WriteString for StructType {
+    fn write_string(&self) -> String {
+        assert_ne!(self.kind.node, StructKind::Union);
+        let id = self.identifier.write_string();
+        if let Some(decls) = &self.declarations {
+            let decl = decls.iter().map(WriteString::write_string).join(" ");
+            format!("struct {} {{ {} }}", id, decl)
+        } else {
+            format!("struct {}", id)
+        }
+    }
+}
+
+impl WriteString for StructDeclaration {
+    fn write_string(&self) -> String {
+        match self {
+            StructDeclaration::Field(f) => {
+                let spec = f
+                    .node
+                    .specifiers
+                    .iter()
+                    .map(WriteString::write_string)
+                    .join(" ");
+                let decl = f
+                    .node
+                    .declarators
+                    .iter()
+                    .map(WriteString::write_string)
+                    .join(" ");
+
+                format!("{} {};", spec, decl)
+            }
+            StructDeclaration::StaticAssert(_) => {
+                panic!("not supported StructDeclaration::StaticAssert")
+            }
+        }
+    }
+}
+
+impl WriteString for StructDeclarator {
+    fn write_string(&self) -> String {
+        let decl = self.declarator.write_string();
+        if let Some(bit) = &self.bit_width {
+            format!("{} : {}", decl, bit.write_string())
+        } else {
+            decl
         }
     }
 }
@@ -540,8 +620,8 @@ impl WriteString for Declarator {
         assert!(self.extensions.is_empty(), "extension should be empty");
         let kind = match &self.kind.node {
             DeclaratorKind::Abstract => "".to_string(),
-            DeclaratorKind::Identifier(id) => id.write_string(),
-            DeclaratorKind::Declarator(decl) => decl.write_string(),
+            DeclaratorKind::Identifier(id) => format!(" {}", id.write_string()),
+            DeclaratorKind::Declarator(decl) => format!("({})", decl.write_string()),
         };
 
         let mut inner: String = kind.clone();
@@ -556,7 +636,7 @@ impl WriteString for Declarator {
                             _ => panic!("not supported"),
                         })
                         .join(" ");
-                    inner = format!("*{} {}", pointer, inner)
+                    inner = format!("*{}{}", pointer, inner);
                 }
                 DerivedDeclarator::Array(arr) => {
                     let typ = arr
@@ -569,7 +649,7 @@ impl WriteString for Declarator {
                         ArraySize::VariableExpression(expr) => expr.write_string(),
                         _ => panic!("not supported"),
                     };
-                    inner = format!("{} {}[{}]", typ, inner, size)
+                    inner = format!("{}{}[{}]", typ, inner, size);
                 }
                 DerivedDeclarator::Function(fdec) => {
                     assert_eq!(fdec.node.ellipsis, Ellipsis::None);
@@ -579,11 +659,11 @@ impl WriteString for Declarator {
                         .iter()
                         .map(WriteString::write_string)
                         .join(", ");
-                    inner = format!("{}({})", inner, param)
+                    inner = format!("{}({})", inner, param);
                 }
                 DerivedDeclarator::KRFunction(ids) => {
                     let identifier = ids.iter().map(WriteString::write_string).join(",");
-                    inner = format!("{}({})", inner, identifier)
+                    inner = format!("{}({})", inner, identifier);
                 }
                 _ => panic!("unsupported"),
             };
@@ -601,7 +681,7 @@ impl WriteString for ParameterDeclaration {
             .map(WriteString::write_string)
             .join(" ");
         if let Some(decl) = &self.declarator {
-            format!("{} {}", specs, decl.write_string())
+            format!("{}{}", specs, decl.write_string())
         } else {
             specs
         }
