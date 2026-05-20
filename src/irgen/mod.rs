@@ -291,6 +291,7 @@ impl Irgen {
         let name_of_params = name_of_params_from_function_declarator(declarator)
             .expect("declarator is not from function definition");
 
+        // finding out the type from the specifiers.
         let (base_dtype, is_typedef) = ir::Dtype::try_from_ast_declaration_specifiers(specifiers)
             .map_err(|e| {
             IrgenError::new(
@@ -299,6 +300,7 @@ impl Irgen {
             )
         })?;
 
+        // typedef cant be function definition
         if is_typedef {
             return Err(IrgenError::new(
                 format!("specs: {specifiers:#?}\ndecl: {declarator:#?}"),
@@ -308,6 +310,13 @@ impl Irgen {
             ));
         }
 
+        // the declarator also have a say in type like
+        // int x; -> x is an int
+        // int *x; -> x is a pointer to int
+        // int x[10] -> x is an array with 10 int
+        // for this it is a dtype of the function so it should look a bit different but whatever
+        // lol
+        //
         let dtype = base_dtype
             .with_ast_declarator(declarator)
             .map_err(|e| {
@@ -325,11 +334,18 @@ impl Irgen {
             )
         })?;
 
+        // this dtype should always be a function type but with different returns and params types
         let signature = ir::FunctionSignature::new(dtype.clone());
 
         // Adds new declaration if nothing has been declared before
         let decl = ir::Declaration::try_from(dtype).unwrap();
         self.add_decl(&name, decl)?;
+
+        // int fibonacci(int x) {
+        //   ..
+        //   in case of recursion, we have to add decl here instead of the end of the translation
+        //   return fibonacci (x - 1) + fibonacci (x-2)
+        // }
 
         // Prepare scope for global variable
         let global_scope: HashMap<_, _> = self
