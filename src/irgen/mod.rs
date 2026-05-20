@@ -606,6 +606,45 @@ impl IrgenFunc<'_> {
         bid_continue: Option<ir::BlockId>,
         bid_break: Option<ir::BlockId>,
     ) -> Result<(), IrgenError> {
+        match stmt {
+            Statement::Labeled(node) => todo!(),
+            Statement::Compound(items) => {
+                self.enter_scope();
+
+                for item in items {
+                    match &item.node {
+                        BlockItem::Declaration(decl) => self
+                            .translate_decl(&decl.node, context)
+                            .map_err(|e| IrgenError::new(decl.write_string(), e))?,
+                        BlockItem::Statement(stmt) => {
+                            self.translate_stmt(&stmt.node, context, bid_continue, bid_break)?;
+                        }
+                        BlockItem::StaticAssert(_) => {
+                            panic!("BlockItem::StaticAssert is not supported")
+                        }
+                    }
+                }
+            }
+            Statement::Expression(node) => todo!(),
+            Statement::If(node) => todo!(),
+            Statement::Switch(node) => todo!(),
+            Statement::While(node) => todo!(),
+            Statement::DoWhile(node) => todo!(),
+            Statement::For(node) => todo!(),
+            Statement::Goto(node) => todo!(),
+            Statement::Continue => todo!(),
+            Statement::Break => todo!(),
+            Statement::Return(node) => todo!(),
+            Statement::Asm(node) => todo!(),
+        }
+        todo!()
+    }
+
+    fn translate_decl(
+        &mut self,
+        decl: &Declaration,
+        context: &mut Context,
+    ) -> Result<(), IrgenErrorMessage> {
         todo!()
     }
 
@@ -682,6 +721,57 @@ impl IrgenFunc<'_> {
         name_of_params: &[String],
         context: &mut Context,
     ) -> Result<(), IrgenErrorMessage> {
+        // aid is allocation id
+        for (aid, (dtype, var_name)) in izip!(&signature.params, name_of_params).enumerate() {
+            let value = Some(ir::Operand::register(
+                ir::RegisterId::arg(bid_init, aid),
+                dtype.clone(),
+            ));
+        }
+        todo!()
+    }
+
+    fn translate_alloc(
+        &mut self,
+        var: String,
+        dtype: ir::Dtype,
+        value: Option<ir::Operand>,
+        context: &mut Context,
+    ) -> Result<ir::Operand, IrgenErrorMessage> {
+        // insert the allocation
+        let aid = self.insert_alloc(Named::new(Some(var.clone()), dtype.clone()));
+
+        // int @foo(%x: int) {
+        //
+        // alloc xa: int -> this is inserting allocation and getting the id | xa: *int which is a
+        //                  pointer type
+        // store %x xa -> this is allocating value
+        //
+        // }
+
+        // create the pointer that points to the allocation
+        // the type of the pointer is a pointer to the type of the allocated data
+        let pointer_type = ir::Dtype::pointer(dtype.clone());
+        let ptr = ir::Operand::register(aid, pointer_type);
+        self.insert_symbol_table_entry(var, ptr.clone())?;
+
+        // if the allocation also assign some values to the allocation then we need to store it
+        if let Some(value) = value {
+            let value = self.translate_typecast(value, &dtype, context)?;
+
+            // store %x xa -> this is allocating value
+
+            return context.insert_instruction(ir::Instruction::Store { ptr, value });
+        }
+        todo!()
+    }
+
+    fn translate_typecast(
+        &mut self,
+        value: ir::Operand,
+        dtype: &ir::Dtype,
+        context: &mut Context,
+    ) -> Result<ir::Operand, IrgenErrorMessage> {
         todo!()
     }
 }
