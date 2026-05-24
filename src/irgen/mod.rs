@@ -715,7 +715,55 @@ impl IrgenFunc<'_> {
                 Ok(())
             }
             Statement::Switch(node) => todo!(),
-            Statement::While(node) => todo!(),
+            Statement::While(stmt) => {
+                let while_stmt = &stmt.node;
+
+                let bid_cond = self.alloc_bid();
+
+                // committing the previous block and jumping to the condition block
+                // now context = bid_cond
+                self.insert_block(
+                    mem::replace(context, Context::new(bid_cond)),
+                    ir::BlockExit::Jump {
+                        arg: ir::JumpArg::new(bid_cond, Vec::new()),
+                    },
+                );
+
+                let bid_body = self.alloc_bid();
+                let bid_end = self.alloc_bid();
+
+                // translating the condition block and committing it
+                // now context = bid_end
+                self.translate_condition(
+                    &while_stmt.expression.node,
+                    mem::replace(context, Context::new(bid_end)),
+                    bid_body,
+                    bid_end,
+                )
+                .map_err(|e| IrgenError::new(while_stmt.expression.write_string(), e))?;
+
+                self.enter_scope();
+
+                let mut context_body = Context::new(bid_body);
+
+                self.translate_stmt(
+                    &while_stmt.statement.node,
+                    &mut context_body,
+                    Some(bid_cond),
+                    Some(bid_end),
+                )?;
+
+                self.insert_block(
+                    context_body,
+                    ir::BlockExit::Jump {
+                        arg: ir::JumpArg::new(bid_cond, Vec::new()),
+                    },
+                );
+
+                self.exit_scope();
+
+                Ok(())
+            }
             Statement::DoWhile(node) => todo!(),
             Statement::For(stmt) => {
                 // sanity check
