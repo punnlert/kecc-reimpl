@@ -627,7 +627,7 @@ impl IrgenFunc<'_> {
         bid_break: Option<ir::BlockId>,
     ) -> Result<(), IrgenError> {
         match stmt {
-            Statement::Labeled(node) => todo!(),
+            Statement::Labeled(_) => panic!("labelled outside switch? bad!"),
             Statement::Compound(items) => {
                 self.enter_scope();
 
