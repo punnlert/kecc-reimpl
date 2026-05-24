@@ -726,6 +726,44 @@ impl IrgenFunc<'_> {
         }
     }
 
+    fn translate_opt_condition(
+        &mut self,
+        cond: &Option<Box<Node<Expression>>>,
+        context: Context,
+        bid_then: ir::BlockId,
+        bid_else: ir::BlockId,
+    ) -> Result<(), IrgenErrorMessage> {
+        if let Some(condition) = cond {
+            self.translate_condition(&condition.node, context, bid_then, bid_else)
+        } else {
+            self.insert_block(
+                context,
+                ir::BlockExit::Jump {
+                    arg: ir::JumpArg::new(bid_then, Vec::new()),
+                },
+            );
+            Ok(())
+        }
+    }
+
+    fn translate_for_initializer(
+        &mut self,
+        init: &ForInitializer,
+        context: &mut Context,
+    ) -> Result<(), IrgenErrorMessage> {
+        let _unused = match init {
+            ForInitializer::Empty => (),
+            ForInitializer::Expression(expr) => {
+                let _unused = self.translate_expr_rvalue(&expr.node, context)?;
+            }
+            ForInitializer::Declaration(decl) => {
+                return self.translate_decl(&decl.node, context);
+            }
+            ForInitializer::StaticAssert(node) => panic!("not supported"),
+        };
+        Ok(())
+    }
+
     fn translate_condition(
         &mut self,
         cond: &Expression,
