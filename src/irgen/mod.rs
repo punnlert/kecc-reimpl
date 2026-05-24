@@ -766,13 +766,26 @@ impl IrgenFunc<'_> {
         todo!()
     }
 
+    /// typecast "value" to "dtype"
+    /// if value already has type "dtype"
+    /// just return value
+    ///
     fn translate_typecast(
         &mut self,
         value: ir::Operand,
         dtype: &ir::Dtype,
         context: &mut Context,
     ) -> Result<ir::Operand, IrgenErrorMessage> {
-        todo!()
+        let v_dtype = value.dtype();
+
+        if &v_dtype == dtype {
+            Ok(value)
+        } else {
+            context.insert_instruction(ir::Instruction::TypeCast {
+                value,
+                target_dtype: dtype.clone(),
+            })
+        }
     }
 }
 
