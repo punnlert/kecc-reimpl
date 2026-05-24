@@ -646,6 +646,78 @@ impl IrgenFunc<'_> {
         context: &mut Context,
     ) -> Result<(), IrgenErrorMessage> {
         todo!()
+    /// Translate the register value of an expression
+    /// e.g.
+    /// y = x + 3
+    ///
+    /// %t1 = load %x0
+    /// %t2 = add %t1 3
+    ///
+    /// we are interested in x in the right hand side
+    /// we want to calculate the thing on the right hand side, so we have to load x first as t1
+    fn translate_expr_rvalue(
+        &mut self,
+        expr: &Expression,
+        context: &mut Context,
+    ) -> Result<ir::Operand, IrgenErrorMessage> {
+        match expr {
+            Expression::Identifier(id) => {
+                // if its identifier then return the pointer to the value of the identifier
+                let ptr = self.lookup_symbol_table_entry(&id.node.name)?;
+                let ptr_dtype = ptr.dtype();
+                let ptr_inner_dtype = ptr_dtype
+                    .get_pointer_inner()
+                    .ok_or_else(|| panic!("lookup table should return pointer type"))?;
+
+                // when ptr points to function or an array, we don't have to load the value and
+                // just return the pointer
+                if ptr_inner_dtype.get_function_inner().is_some() {
+                    return Ok(ptr);
+                }
+
+                if let Some(array_inner) = ptr_inner_dtype.get_array_inner() {
+                    todo!("return convert array to pointer")
+                }
+
+                // this function insert instruction into the current context AND assign it to a
+                // temp register, so it returns the temp register
+                context.insert_instruction(ir::Instruction::Load { ptr })
+            }
+            Expression::Constant(con) => {
+                let constant = ir::Constant::try_from(&con.node)
+                    .expect("constant should convert to ir constant fine");
+
+                Ok(ir::Operand::Constant(constant))
+            }
+            Expression::StringLiteral(_string_lit) => todo!(),
+            Expression::GenericSelection(node) => todo!(),
+            Expression::Member(node) => todo!(),
+            Expression::Call(node) => todo!(),
+            Expression::CompoundLiteral(node) => todo!(),
+            Expression::SizeOfTy(type_name) => {
+                let dtype = ir::Dtype::try_from(&type_name.node.0.node)
+                    .map_err(|e| IrgenErrorMessage::InvalidDtype { dtype_error: e })?;
+                let (size_of, _) = dtype
+                    .size_align_of(self.structs)
+                    .map_err(|e| IrgenErrorMessage::InvalidDtype { dtype_error: e })?;
+
+                Ok(ir::Operand::Constant(ir::Constant::int(
+                    size_of as u128,
+                    ir::Dtype::LONG,
+                )))
+            }
+            Expression::SizeOfVal(node) => todo!(),
+            Expression::AlignOf(node) => todo!(),
+            Expression::UnaryOperator(node) => todo!(),
+            Expression::Cast(node) => todo!(),
+            Expression::BinaryOperator(node) => todo!(),
+            Expression::Conditional(node) => todo!(),
+            Expression::Comma(nodes) => todo!(),
+            Expression::OffsetOf(node) => todo!(),
+            Expression::VaArg(node) => todo!(),
+            Expression::Statement(node) => todo!(),
+        }
+    }
     }
 
     /// Translate initial parameter declarations of the functions to IR.
