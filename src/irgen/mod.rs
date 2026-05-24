@@ -646,6 +646,17 @@ impl IrgenFunc<'_> {
         context: &mut Context,
     ) -> Result<(), IrgenErrorMessage> {
         todo!()
+    fn translate_initializer(
+        &mut self,
+        initializer: &Initializer,
+        context: &mut Context,
+    ) -> Result<ir::Operand, IrgenErrorMessage> {
+        match initializer {
+            Initializer::Expression(expr) => self.translate_expr_rvalue(&expr.node, context),
+            Initializer::List(_) => panic!("Initializer::List is not supported"),
+        }
+    }
+
     /// Translate the register value of an expression
     /// e.g.
     /// y = x + 3
