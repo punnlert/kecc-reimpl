@@ -638,6 +638,27 @@ impl IrgenFunc<'_> {
             Statement::Asm(node) => todo!(),
         }
         todo!()
+    fn translate_condition(
+        &mut self,
+        cond: &Expression,
+        mut context: Context,
+        bid_then: ir::BlockId,
+        bid_else: ir::BlockId,
+    ) -> Result<(), IrgenErrorMessage> {
+        let condition = self.translate_expr_rvalue(cond, &mut context)?;
+        let condition = self.translate_typecast_to_bool(condition, &mut context)?;
+
+        self.insert_block(
+            context,
+            ir::BlockExit::ConditionalJump {
+                condition,
+                arg_then: ir::JumpArg::new(bid_then, Vec::new()),
+                arg_else: ir::JumpArg::new(bid_else, Vec::new()),
+            },
+        );
+
+        Ok(())
+    }
     }
 
     fn translate_decl(
