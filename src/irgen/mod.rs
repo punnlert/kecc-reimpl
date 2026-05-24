@@ -919,10 +919,29 @@ impl IrgenFunc<'_> {
                 Ok(())
             }
             Statement::Goto(node) => todo!(),
-            Statement::Continue => todo!(),
-            Statement::Break => todo!(),
-            Statement::Return(node) => todo!(),
-            Statement::Asm(node) => todo!(),
+            Statement::Continue => {
+                // if there is a continue then there should be a continuation block
+                let bid_cont = bid_continue.ok_or_else(|| {
+                    IrgenError::new(
+                        "continuation not found".to_string(),
+                        IrgenErrorMessage::Misc {
+                            message: "can't find continuation of this block".to_string(),
+                        },
+                    )
+                })?;
+
+                // allocate next block
+                let mut next_context = self.alloc_bid();
+
+                self.insert_block(
+                    mem::replace(context, Context::new(next_context)),
+                    ir::BlockExit::Jump {
+                        arg: ir::JumpArg::new(bid_cont, Vec::new()),
+                    },
+                );
+
+                Ok(())
+            }
         }
     }
 
