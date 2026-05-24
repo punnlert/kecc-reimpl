@@ -785,7 +785,57 @@ impl IrgenFunc<'_> {
 
                 Ok(())
             }
-            Statement::DoWhile(node) => todo!(),
+            Statement::DoWhile(stmt) => {
+                // do -> condition -> do -> ... -> end
+                let dowhile_stmt = &stmt.node;
+
+                let bid_body = self.alloc_bid();
+
+                // commit the block before
+                // now context is bid_body
+                self.insert_block(
+                    mem::replace(context, Context::new(bid_body)),
+                    ir::BlockExit::Jump {
+                        arg: ir::JumpArg::new(bid_body, Vec::new()),
+                    },
+                );
+
+                self.enter_scope();
+
+                let bid_cond = self.alloc_bid();
+                let bid_end = self.alloc_bid();
+
+                // do while do anything without condition first
+                self.translate_stmt(
+                    &dowhile_stmt.statement.node,
+                    context,
+                    Some(bid_cond),
+                    Some(bid_end),
+                )?;
+
+                self.exit_scope();
+
+                // commit body block
+                // now context = bid_cond
+                self.insert_block(
+                    mem::replace(context, Context::new(bid_cond)),
+                    ir::BlockExit::Jump {
+                        arg: ir::JumpArg::new(bid_cond, Vec::new()),
+                    },
+                );
+
+                // commit condition block
+                // now context = bid_end
+                self.translate_condition(
+                    &dowhile_stmt.expression.node,
+                    mem::replace(context, Context::new(bid_end)),
+                    bid_body,
+                    bid_end,
+                )
+                .map_err(|e| IrgenError::new(dowhile_stmt.expression.write_string(), e))?;
+
+                Ok(())
+            }
             Statement::For(stmt) => {
                 // sanity check
                 // init -> condition -> body -> step -> condition ... -> end
