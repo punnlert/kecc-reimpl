@@ -185,6 +185,7 @@ impl Irgen {
         for init_decl in &source.declarators {
             let declarator = &init_decl.node.declarator.node;
             let name = name_of_declarator(declarator);
+            // reference cloning based dtype in translate_decl
             let dtype = base_dtype
                 .clone()
                 .with_ast_declarator(declarator)
@@ -636,16 +637,83 @@ impl IrgenFunc<'_> {
                             .translate_decl(&decl.node, context)
                             .map_err(|e| IrgenError::new(decl.write_string(), e))?,
                         BlockItem::Statement(stmt) => {
-                            self.translate_stmt(&stmt.node, context, bid_continue, bid_break)?;
+                            self.translate_stmt(&stmt.node, context, bid_continue, bid_break)?
                         }
                         BlockItem::StaticAssert(_) => {
                             panic!("BlockItem::StaticAssert is not supported")
                         }
                     }
                 }
+
+                Ok(())
             }
-            Statement::Expression(node) => todo!(),
-            Statement::If(node) => todo!(),
+            // like
+            // x+1;
+            //
+            // we still have to eval the expr but we dont have to store the value anywhere
+            Statement::Expression(expr) => {
+                if let Some(expr) = expr {
+                    let _unused = self
+                        .translate_expr_rvalue(&expr.node, context)
+                        .map_err(|e| IrgenError::new(expr.write_string(), e))?;
+                }
+
+                Ok(())
+            }
+            Statement::If(stmt) => {
+                let bid_then = self.alloc_bid();
+                let bid_else = self.alloc_bid();
+                let bid_end = self.alloc_bid();
+
+                // translating condition with all the bid of then and else with new context with
+                // bid_end (because you have to jump to bid_end if cant jump to else or then)
+                // commiting last block
+                //
+                // ok, i understand now. so this is the last instruction of the previous block. we
+                // are gonna jump conditionally based on the condition. then, after inserting the
+                // conditional jump as the last exit of the block, we commit the previous block and
+                // replace the context of the caller with the bid_end of this if statement (which
+                // has empty instruction)
+                self.translate_condition(
+                    &stmt.node.condition.node,
+                    mem::replace(context, Context::new(bid_end)),
+                    bid_then,
+                    bid_else,
+                )
+                .map_err(|e| IrgenError::new(stmt.node.condition.write_string(), e))?;
+
+                // make new context for the then block
+                let mut context_then = Context::new(bid_then);
+
+                // translate the then stmt and put all the translated inside the context
+                self.translate_stmt(
+                    &stmt.node.then_statement.node,
+                    &mut context_then,
+                    bid_continue,
+                    bid_break,
+                )?;
+
+                // commit the then block with jump arg being the next block we're translating
+                self.insert_block(
+                    context_then,
+                    ir::BlockExit::Jump {
+                        arg: ir::JumpArg::new(bid_end, Vec::new()),
+                    },
+                );
+
+                let mut context_else = Context::new(bid_else);
+                if let Some(else_block) = &stmt.node.else_statement {
+                    self.translate_stmt(&else_block.node, context, bid_continue, bid_break)?;
+                }
+
+                self.insert_block(
+                    context_else,
+                    ir::BlockExit::Jump {
+                        arg: ir::JumpArg::new(bid_end, Vec::new()),
+                    },
+                );
+                Ok(())
+            }
             Statement::Switch(node) => todo!(),
             Statement::While(node) => todo!(),
             Statement::DoWhile(node) => todo!(),
@@ -656,7 +724,8 @@ impl IrgenFunc<'_> {
             Statement::Return(node) => todo!(),
             Statement::Asm(node) => todo!(),
         }
-        todo!()
+    }
+
     fn translate_condition(
         &mut self,
         cond: &Expression,
