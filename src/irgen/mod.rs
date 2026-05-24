@@ -763,7 +763,7 @@ impl IrgenFunc<'_> {
 
             return context.insert_instruction(ir::Instruction::Store { ptr, value });
         }
-        todo!()
+        Ok(ptr)
     }
 
     /// typecast "value" to "dtype"
