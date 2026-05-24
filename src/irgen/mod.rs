@@ -714,7 +714,28 @@ impl IrgenFunc<'_> {
                 );
                 Ok(())
             }
-            Statement::Switch(node) => todo!(),
+            Statement::Switch(stmt) => {
+                let switch_stmt = &stmt.node;
+
+                let value = self
+                    .translate_expr_rvalue(&switch_stmt.expression.node, context)
+                    .map_err(|e| IrgenError::new(switch_stmt.expression.write_string(), e))?;
+
+                let bid_end = self.alloc_bid();
+                let (cases, bid_default) =
+                    self.translate_switch_body(&switch_stmt.statement.node, bid_end)?;
+
+                self.insert_block(
+                    mem::replace(context, Context::new(bid_end)),
+                    ir::BlockExit::Switch {
+                        value,
+                        default: ir::JumpArg::new(bid_default, Vec::new()),
+                        cases,
+                    },
+                );
+
+                Ok(())
+            }
             Statement::While(stmt) => {
                 let while_stmt = &stmt.node;
 
@@ -853,6 +874,174 @@ impl IrgenFunc<'_> {
             Statement::Return(node) => todo!(),
             Statement::Asm(node) => todo!(),
         }
+    }
+
+    fn translate_switch_body(
+        &mut self,
+        statement: &Statement,
+        bid_end: ir::BlockId,
+    ) -> Result<(Vec<(ir::Constant, ir::JumpArg)>, ir::BlockId), IrgenError> {
+        let stmts = if let Statement::Compound(stmts) = statement {
+            stmts
+        } else {
+            panic!("only compound statement in switch statement")
+        };
+
+        let mut cases: Vec<(ir::Constant, ir::JumpArg)> = Vec::new();
+        let mut default: Option<ir::BlockId> = None;
+
+        self.enter_scope();
+
+        for stmt in stmts {
+            match &stmt.node {
+                BlockItem::Statement(labelled_stmt) => self.translate_switch_body_inner(
+                    &labelled_stmt.node,
+                    &mut cases,
+                    &mut default,
+                    bid_end,
+                )?,
+                _ => panic!("statement in switch can only be labelled statement"),
+            }
+        }
+
+        self.exit_scope();
+
+        // if there is no default block just skip to the end
+        let default = default.unwrap_or(bid_end);
+
+        Ok((cases, default))
+    }
+
+    fn translate_switch_body_inner(
+        &mut self,
+        statement: &Statement,
+        cases: &mut Vec<(ir::Constant, ir::JumpArg)>,
+        default: &mut Option<ir::BlockId>,
+        bid_end: ir::BlockId,
+    ) -> Result<(), IrgenError> {
+        // stmt => case 1: {A1; break;}
+        //
+        let bid_body = self.alloc_bid();
+        let mut context_body = Context::new(bid_body);
+        let label_stmt = if let Statement::Labeled(label) = statement {
+            &label.node
+        } else {
+            panic!("statement inside the switch body should all be labeled statement");
+        };
+
+        // translating the case body and getting it case value
+        let case = self.translate_switch_body_label_statement(label_stmt, bid_body, bid_end)?;
+
+        if let Some(case) = case {
+            if !case.is_integer_constant() {
+                return Err(IrgenError::new(
+                    case.to_string(),
+                    IrgenErrorMessage::Misc {
+                        message: "case expression should resolve into an integer constant"
+                            .to_string(),
+                    },
+                ));
+            }
+
+            // TODO: consider the case that it has the same value but different width
+            // [HERE] my solution attempt. i just have faith that it will unwrap
+            if cases
+                .iter()
+                .any(|(c, _)| case.get_int().unwrap().0 == c.get_int().unwrap().0)
+            {
+                return Err(IrgenError::new(
+                    label_stmt.write_string(),
+                    IrgenErrorMessage::Misc {
+                        message: "duplicate label case".to_string(),
+                    },
+                ));
+            }
+            cases.push((case, ir::JumpArg::new(bid_body, Vec::new())));
+        } else {
+            if default.is_some() {
+                return Err(IrgenError::new(
+                    label_stmt.write_string(),
+                    IrgenErrorMessage::Misc {
+                        message: "duplicate default cases".to_string(),
+                    },
+                ));
+            }
+            *default = Some(bid_body);
+        }
+
+        Ok(())
+    }
+
+    fn translate_switch_body_label_statement(
+        &mut self,
+        label_stmt: &LabeledStatement,
+        bid_curr: ir::BlockId,
+        bid_end: ir::BlockId,
+    ) -> Result<Option<ir::Constant>, IrgenError> {
+        let case: Option<ir::Constant> = match &label_stmt.label.node {
+            Label::Case(expr) => {
+                let con = ir::Constant::try_from(&expr.node).map_err(|_| {
+                    IrgenError::new(
+                        expr.write_string(),
+                        IrgenErrorMessage::Misc {
+                            message: "only allow constant as case label".to_string(),
+                        },
+                    )
+                })?;
+                Some(con)
+            }
+            Label::Default => None,
+            _ => panic!("Label::Identifier and Label::Range is not supported in this KECC"),
+        };
+
+        // cause we expect like { A1; break; } so it has to be a compound
+        let items = if let Statement::Compound(items) = &label_stmt.statement.node {
+            items
+        } else {
+            panic!("statement label is not a compound statement");
+        };
+
+        self.enter_scope();
+
+        let (last, items) = items
+            .split_last()
+            .expect("should have break; as the last item");
+
+        let mut context_body = Context::new(bid_curr);
+
+        for item in items {
+            match &item.node {
+                BlockItem::Declaration(decl) => {
+                    self.translate_decl(&decl.node, &mut context_body)
+                        .map_err(|e| IrgenError::new(decl.write_string(), e))?;
+                }
+                BlockItem::Statement(stmt) => {
+                    self.translate_stmt(&stmt.node, &mut context_body, None, None)?;
+                }
+                BlockItem::StaticAssert(_) => panic!("not supported"),
+            }
+        }
+
+        let last_stmt = if let BlockItem::Statement(stmt) = &last.node {
+            stmt.node.clone()
+        } else {
+            panic!("last item HAVE TO be a break. which is a statement")
+        };
+
+        assert_eq!(last_stmt, Statement::Break);
+
+        // conclude the block to the ending block (we made sure that the last statement is break
+        // anyway)
+        self.insert_block(
+            context_body,
+            ir::BlockExit::Jump {
+                arg: ir::JumpArg::new(bid_end, Vec::new()),
+            },
+        );
+
+        self.exit_scope();
+
+        Ok(case)
     }
 
     fn translate_opt_condition(
