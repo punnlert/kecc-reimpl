@@ -942,6 +942,29 @@ impl IrgenFunc<'_> {
 
                 Ok(())
             }
+            Statement::Break => {
+                let bid_break = bid_break.ok_or_else(|| {
+                    IrgenError::new(
+                        "continuation not found".to_string(),
+                        IrgenErrorMessage::Misc {
+                            message: "can't find continuation of this block after break"
+                                .to_string(),
+                        },
+                    )
+                })?;
+
+                // allocate next block
+                let mut next_context = self.alloc_bid();
+
+                self.insert_block(
+                    mem::replace(context, Context::new(next_context)),
+                    ir::BlockExit::Jump {
+                        arg: ir::JumpArg::new(bid_break, Vec::new()),
+                    },
+                );
+
+                Ok(())
+            }
         }
     }
 
