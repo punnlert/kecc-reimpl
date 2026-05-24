@@ -718,6 +718,63 @@ impl IrgenFunc<'_> {
             Expression::Statement(node) => todo!(),
         }
     }
+
+    /// get the location value when the expr is on the lhs of the place or when we need the location
+    /// value
+    ///
+    /// x = 20 + 25;
+    /// in this case we want x, so we have to get the location of x
+    fn translate_expr_lvalue(
+        &mut self,
+        expr: &Expression,
+        context: &mut Context,
+    ) -> Result<ir::Operand, IrgenErrorMessage> {
+        match expr {
+            Expression::Identifier(id) => self.lookup_symbol_table_entry(&id.node.name),
+            Expression::Constant(_) => {
+                panic!("Expression::Constant cannot be on the left hand side of the expression")
+            }
+            Expression::UnaryOperator(expr) => {
+                // only support unary op when its indirection, other thing is not supported
+                //
+                // e.g. !x = false; => this is not ok
+                match expr.node.operator.node {
+                    // indirection
+                    // *x = 64
+                    // then we have to get the location of x
+                    UnaryOperator::Indirection => {
+                        Ok(self.translate_expr_rvalue(&expr.node.operand.node, context)?)
+                    }
+                    _ => panic!("unary op other than indirection is not supported"),
+                }
+            }
+            Expression::BinaryOperator(expr) => {
+                // only support binary op when its array indexing
+                match expr.node.operator.node {
+                    BinaryOperator::Index => {
+                        todo!("translating indexing operator");
+                    }
+                    _ => panic!(
+                        "can't use binary operator as a destination to value except indexing"
+                    ),
+                }
+            }
+            Expression::StringLiteral(_) => {
+                panic!("can't use string literal on the left hand side of the assignment")
+            }
+            Expression::Member(node) => todo!(),
+            Expression::Call(_)
+            | Expression::SizeOfTy(_)
+            | Expression::SizeOfVal(_)
+            | Expression::AlignOf(_)
+            | Expression::Cast(_)
+            | Expression::Conditional(_)
+            | Expression::Comma(_)
+            | Expression::Statement(_) => Err(IrgenErrorMessage::Misc {
+                message: "this error occured at translate_expr_lvalue".to_string(),
+            }),
+            _ => panic!("not supported"),
+        }
     }
 
     /// Translate initial parameter declarations of the functions to IR.
