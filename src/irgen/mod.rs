@@ -659,6 +659,13 @@ impl IrgenFunc<'_> {
 
         Ok(())
     }
+
+    fn translate_typecast_to_bool(
+        &mut self,
+        value: ir::Operand,
+        context: &mut Context,
+    ) -> Result<ir::Operand, IrgenErrorMessage> {
+        self.translate_typecast(value, &ir::Dtype::BOOL, context)
     }
 
     fn translate_decl(
