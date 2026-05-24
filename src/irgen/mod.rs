@@ -717,7 +717,84 @@ impl IrgenFunc<'_> {
             Statement::Switch(node) => todo!(),
             Statement::While(node) => todo!(),
             Statement::DoWhile(node) => todo!(),
-            Statement::For(node) => todo!(),
+            Statement::For(stmt) => {
+                let for_stmt = &stmt.node;
+
+                // commit the current context and the exit instruction of the current context is to
+                // jump to this new block for initializer
+                let bid_init = self.alloc_bid();
+                self.insert_block(
+                    mem::replace(context, Context::new(bid_init)),
+                    ir::BlockExit::Jump {
+                        arg: ir::JumpArg::new(bid_init, Vec::new()),
+                    },
+                );
+
+                self.enter_scope();
+
+                self.translate_for_initializer(&for_stmt.initializer.node, context)
+                    .map_err(|e| IrgenError::new(for_stmt.initializer.write_string(), e))?;
+
+                let bid_cond = self.alloc_bid(); // for the conditional block
+                // committing the init block and jump to the conditional block
+                self.insert_block(
+                    mem::replace(context, Context::new(bid_cond)),
+                    ir::BlockExit::Jump {
+                        arg: ir::JumpArg::new(bid_cond, Vec::new()),
+                    },
+                );
+
+                let bid_body = self.alloc_bid();
+                let bid_step = self.alloc_bid();
+                let bid_end = self.alloc_bid();
+
+                self.translate_opt_condition(
+                    &for_stmt.condition,
+                    mem::replace(context, Context::new(bid_end)),
+                    bid_body,
+                    bid_end,
+                )
+                .map_err(|e| IrgenError::new(for_stmt.condition.write_string(), e))?;
+
+                self.enter_scope(); //entering scope for the body of the execution
+
+                let mut context_body = Context::new(bid_body);
+                self.translate_stmt(
+                    &for_stmt.statement.node,
+                    &mut context_body,
+                    Some(bid_step),
+                    Some(bid_end),
+                )?;
+
+                self.exit_scope();
+
+                self.insert_block(
+                    context_body,
+                    ir::BlockExit::Jump {
+                        arg: ir::JumpArg::new(bid_step, Vec::new()),
+                    },
+                );
+
+                let mut context_step = Context::new(bid_step);
+
+                if let Some(step_expr) = &for_stmt.step {
+                    let _unused = self
+                        .translate_expr_rvalue(&step_expr.node, &mut context_step)
+                        .map_err(|e| IrgenError::new(step_expr.write_string(), e))?;
+                }
+
+                self.insert_block(
+                    context_step,
+                    ir::BlockExit::Jump {
+                        arg: ir::JumpArg::new(bid_cond, Vec::new()),
+                    },
+                );
+
+                // exit the scope from the init
+                self.exit_scope();
+
+                Ok(())
+            }
             Statement::Goto(node) => todo!(),
             Statement::Continue => todo!(),
             Statement::Break => todo!(),
