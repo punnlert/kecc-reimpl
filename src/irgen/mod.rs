@@ -597,6 +597,25 @@ impl IrgenFunc<'_> {
         Ok(())
     }
 
+    ///  Get the allocation to the variable with name var
+    fn lookup_symbol_table_entry(
+        &mut self,
+        var: &String,
+    ) -> Result<ir::Operand, IrgenErrorMessage> {
+        let mut operand = None;
+
+        for scope in self.symbol_table.iter().rev() {
+            operand = scope.get(var).clone();
+            if let Some(val) = operand {
+                return Ok(val.clone());
+            }
+        }
+
+        Err(IrgenErrorMessage::Misc {
+            message: format!("can't find {var} in scope"),
+        })
+    }
+
     /// Transalte a C statement `stmt` under the current block `context`, with `continue` block
     /// `bid_continue` and break block `bid_break`.
     fn translate_stmt(
