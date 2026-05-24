@@ -196,6 +196,22 @@ impl WriteString for ForInitializer {
     }
 }
 
+impl WriteString for LabeledStatement {
+    fn write_string(&self) -> String {
+        format!("{} ...", self.label.write_string())
+    }
+}
+
+impl WriteString for Label {
+    fn write_string(&self) -> String {
+        match self {
+            Label::Case(expr) => format!("case {}:", expr.write_string()),
+            Label::Default => "default".to_string(),
+            _ => panic!("not supported"),
+        }
+    }
+}
+
 impl WriteString for Vec<Node<DeclarationSpecifier>> {
     fn write_string(&self) -> String {
         self.iter().map(WriteString::write_string).join(" ")
