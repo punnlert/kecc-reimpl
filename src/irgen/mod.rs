@@ -645,7 +645,55 @@ impl IrgenFunc<'_> {
         decl: &Declaration,
         context: &mut Context,
     ) -> Result<(), IrgenErrorMessage> {
-        todo!()
+        // int x*
+        // int => specifiers
+        // x => declarator
+        let (base_dtype, is_typedef) =
+            ir::Dtype::try_from_ast_declaration_specifiers(&decl.specifiers)
+                .map_err(|e| IrgenErrorMessage::InvalidDtype { dtype_error: e })?;
+
+        // declaration can't be typedef
+        assert!(!is_typedef);
+
+        for init_decl in &decl.declarators {
+            let declarator = &init_decl.node.declarator.node;
+            // see reference in fn add_declaration on how to clone and deref
+            let dtype = base_dtype
+                .clone()
+                .with_ast_declarator(declarator)
+                .map_err(|e| IrgenErrorMessage::InvalidDtype { dtype_error: e })?
+                .deref()
+                .clone();
+            let dtype = dtype
+                .resolve_typedefs(&self.typedefs)
+                .map_err(|e| IrgenErrorMessage::InvalidDtype { dtype_error: e })?;
+            let name = name_of_declarator(declarator);
+
+            match dtype {
+                ir::Dtype::Unit { is_const } => todo!(),
+                ir::Dtype::Int { .. }
+                | ir::Dtype::Float { .. }
+                | ir::Dtype::Pointer { .. }
+                | ir::Dtype::Array { .. }
+                | ir::Dtype::Struct { .. } => {
+                    let init_value = if let Some(value) = &init_decl.node.initializer {
+                        Some(self.translate_initializer(&value.node, context)?)
+                    } else {
+                        None
+                    };
+
+                    let _unused = self.translate_alloc(name, dtype.clone(), init_value, context)?;
+                }
+                ir::Dtype::Function { ret, params } => todo!(),
+                ir::Dtype::Typedef { name, is_const } => {
+                    panic!("typedefs should be resolved by now")
+                }
+            }
+        }
+
+        Ok(())
+    }
+
     fn translate_initializer(
         &mut self,
         initializer: &Initializer,
