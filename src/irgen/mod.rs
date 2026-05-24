@@ -718,6 +718,10 @@ impl IrgenFunc<'_> {
             Statement::While(node) => todo!(),
             Statement::DoWhile(node) => todo!(),
             Statement::For(stmt) => {
+                // sanity check
+                // init -> condition -> body -> step -> condition ... -> end
+                // 5 new blocks
+                // init, condition, body, step, end
                 let for_stmt = &stmt.node;
 
                 // commit the current context and the exit instruction of the current context is to
