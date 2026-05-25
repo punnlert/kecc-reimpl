@@ -1396,7 +1396,17 @@ impl IrgenFunc<'_> {
             Expression::SizeOfVal(node) => todo!(),
             Expression::AlignOf(node) => todo!(),
             Expression::UnaryOperator(node) => todo!(),
-            Expression::Cast(node) => todo!(),
+            Expression::Cast(expr) => {
+                let target_dtype = ir::Dtype::try_from(&expr.node.type_name.node)
+                    .map_err(|e| IrgenErrorMessage::InvalidDtype { dtype_error: e })?;
+                let target_dtype = target_dtype
+                    .resolve_typedefs(&self.typedefs)
+                    .map_err(|e| IrgenErrorMessage::InvalidDtype { dtype_error: e })?;
+
+                let operand = self.translate_expr_rvalue(&expr.node.expression.node, context)?;
+
+                self.translate_typecast(operand, &target_dtype, context)
+            }
             Expression::BinaryOperator(node) => todo!(),
             Expression::Conditional(node) => todo!(),
             Expression::Comma(nodes) => todo!(),
