@@ -1333,6 +1333,44 @@ impl IrgenFunc<'_> {
         })
     }
 
+    fn translate_conditional(
+        &mut self,
+        cond_expr: &ConditionalExpression,
+        context: &mut Context,
+    ) -> Result<ir::Operand, IrgenErrorMessage> {
+        let bid_then = self.alloc_bid();
+        let bid_else = self.alloc_bid();
+        let bid_end = self.alloc_bid();
+
+        // to create the new condition translation, we have to commit the previous block entirely
+        let condition = self.translate_condition(
+            &cond_expr.condition.node,
+            mem::replace(context, Context::new(bid_end)),
+            bid_then,
+            bid_else,
+        )?;
+
+        let mut context_then = Context::new(bid_then);
+        let mut context_else = Context::new(bid_else);
+
+        let val_then =
+            self.translate_expr_rvalue(&cond_expr.then_expression.node, &mut context_then)?;
+        let val_else =
+            self.translate_expr_rvalue(&cond_expr.else_expression.node, &mut context_else)?;
+
+        let merged_dtype = self.merge_dtype(&val_then.dtype(), &val_else.dtype())?;
+
+        todo!()
+    }
+
+    fn merge_dtype(
+        &self,
+        lhs_dtype: &ir::Dtype,
+        rhs_dtype: &ir::Dtype,
+    ) -> Result<ir::Dtype, IrgenErrorMessage> {
+        todo!()
+    }
+
     /// Translate the register value of an expression
     /// e.g.
     /// y = x + 3
