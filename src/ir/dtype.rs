@@ -797,6 +797,9 @@ impl Dtype {
         }
     }
 
+    /// returning the function return type and parameter types.
+    ///
+    /// (return_type, param_type)
     #[inline]
     pub fn get_function_inner(&self) -> Option<(&Self, &Vec<Self>)> {
         if let Self::Function { ret, params } = self {
