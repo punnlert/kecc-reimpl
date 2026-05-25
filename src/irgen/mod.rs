@@ -968,20 +968,21 @@ impl IrgenFunc<'_> {
             Statement::Return(val) => {
                 // not sure if this bid is correct.
                 // might need to jump to bid_continue? have to check when doing function call
+                //
+                // [UPDATE] apparently there is a block exit called return and you can return a
+                // value there. I guess if there is no value then i just return unit type.
                 let bid_next = self.alloc_bid();
-                let ret_val = if let Some(ret_val) = &val {
+                let value = if let Some(ret_val) = &val {
                     let ret_rvalue = self
                         .translate_expr_rvalue(&ret_val.node, context)
                         .map_err(|e| IrgenError::new(ret_val.write_string(), e))?;
-                    vec![ret_rvalue]
+                    ret_rvalue
                 } else {
-                    Vec::new()
+                    ir::Operand::Constant(ir::Constant::unit())
                 };
                 self.insert_block(
                     mem::replace(context, Context::new(bid_next)),
-                    ir::BlockExit::Jump {
-                        arg: ir::JumpArg::new(bid_next, ret_val),
-                    },
+                    ir::BlockExit::Return { value },
                 );
                 Ok(())
             }
