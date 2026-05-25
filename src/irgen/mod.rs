@@ -1388,9 +1388,12 @@ impl IrgenFunc<'_> {
                     .size_align_of(self.structs)
                     .map_err(|e| IrgenErrorMessage::InvalidDtype { dtype_error: e })?;
 
+                // TODO: `is_signed` must be false in the future (unsigned)
+                // [UPDATE] i found the set_signed function in ir Dtype. i think this is the right
+                // way to set it to unsigned
                 Ok(ir::Operand::Constant(ir::Constant::int(
                     size_of as u128,
-                    ir::Dtype::LONG,
+                    ir::Dtype::LONG.set_signed(false),
                 )))
             }
             Expression::SizeOfVal(node) => todo!(),
