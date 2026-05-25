@@ -746,6 +746,9 @@ impl Dtype {
         }
     }
 
+    /// getting the real type inside the pointer
+    ///
+    /// this is a pointer to what
     #[inline]
     pub fn get_pointer_inner(&self) -> Option<&Self> {
         if let Self::Pointer { inner, .. } = self {
