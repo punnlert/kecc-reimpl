@@ -1291,6 +1291,48 @@ impl IrgenFunc<'_> {
         }
     }
 
+    fn translate_func_call(
+        &mut self,
+        call: &CallExpression,
+        context: &mut Context,
+    ) -> Result<ir::Operand, IrgenErrorMessage> {
+        let callee = self.translate_expr_rvalue(&call.callee.node, context)?;
+        let function_pointer = callee.dtype();
+        let inner = function_pointer.get_pointer_inner().ok_or_else(|| {
+            IrgenErrorMessage::NeedFunctionOrFunctionPointer {
+                callee: callee.clone(),
+            }
+        })?;
+        let (return_type, param_type) = inner.get_function_inner().ok_or_else(|| {
+            IrgenErrorMessage::NeedFunctionOrFunctionPointer {
+                callee: callee.clone(),
+            }
+        })?;
+
+        let args = call
+            .arguments
+            .iter()
+            .map(|a| self.translate_expr_rvalue(&a.node, context))
+            .collect::<Result<Vec<_>, _>>()?;
+
+        if args.len() != param_type.len() {
+            return Err(IrgenErrorMessage::Misc {
+                message: "length of argument doesn't match the length of parameter".to_string(),
+            });
+        }
+
+        // typecast all the args to be the correct type for the function param
+        let args = izip!(args, param_type)
+            .map(|(arg, ptype)| self.translate_typecast(arg, ptype, context))
+            .collect::<Result<Vec<_>, _>>()?;
+
+        context.insert_instruction(ir::Instruction::Call {
+            callee,
+            args,
+            return_type: return_type.clone().set_const(false),
+        })
+    }
+
     /// Translate the register value of an expression
     /// e.g.
     /// y = x + 3
@@ -1337,7 +1379,7 @@ impl IrgenFunc<'_> {
             Expression::StringLiteral(_string_lit) => todo!(),
             Expression::GenericSelection(node) => todo!(),
             Expression::Member(node) => todo!(),
-            Expression::Call(node) => todo!(),
+            Expression::Call(call_expr) => self.translate_func_call(&call_expr.node, context),
             Expression::CompoundLiteral(node) => todo!(),
             Expression::SizeOfTy(type_name) => {
                 let dtype = ir::Dtype::try_from(&type_name.node.0.node)
