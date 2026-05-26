@@ -1415,12 +1415,109 @@ impl IrgenFunc<'_> {
         context.insert_instruction(ir::Instruction::Load { ptr })
     }
 
+    // [SELF] have to check
     fn merge_dtype(
         &self,
         lhs_dtype: &ir::Dtype,
         rhs_dtype: &ir::Dtype,
     ) -> Result<ir::Dtype, IrgenErrorMessage> {
-        todo!()
+        //  should i resolve typedef??
+        let lhs_dtype = lhs_dtype
+            .clone()
+            .resolve_typedefs(self.typedefs)
+            .map_err(|e| IrgenErrorMessage::InvalidDtype { dtype_error: e })?;
+        let rhs_dtype = rhs_dtype
+            .clone()
+            .resolve_typedefs(self.typedefs)
+            .map_err(|e| IrgenErrorMessage::InvalidDtype { dtype_error: e })?;
+
+        let merged_dtype = match (lhs_dtype.clone(), rhs_dtype.clone()) {
+            (ir::Dtype::Unit { .. }, ir::Dtype::Unit { .. }) => todo!("can you merge a unit type?"),
+            (
+                ir::Dtype::Int {
+                    width: lhs_width,
+                    is_signed: lhs_is_signed,
+                    is_const: lhs_is_const,
+                },
+                ir::Dtype::Int {
+                    width: rhs_width,
+                    is_signed: rhs_is_signed,
+                    is_const: rhs_is_const,
+                },
+            ) => {
+                let merged_width = lhs_width.max(rhs_width);
+                assert_eq!(
+                    lhs_is_signed, rhs_is_signed,
+                    "{lhs_dtype} and {rhs_dtype} should have the same `is_signed`"
+                );
+                assert_eq!(
+                    lhs_is_const, rhs_is_const,
+                    "{lhs_dtype} and {rhs_dtype} should have the same `is_const`"
+                );
+
+                ir::Dtype::Int {
+                    width: merged_width,
+                    is_signed: lhs_is_signed,
+                    is_const: lhs_is_const,
+                }
+            }
+            (
+                ir::Dtype::Float {
+                    width: lhs_width,
+                    is_const: lhs_is_const,
+                },
+                ir::Dtype::Float {
+                    width: rhs_width,
+                    is_const: rhs_is_const,
+                },
+            ) => {
+                let merged_width = lhs_width.max(rhs_width);
+                assert_eq!(
+                    lhs_is_const, rhs_is_const,
+                    "{lhs_dtype} and {rhs_dtype} should have the same `is_const`"
+                );
+
+                ir::Dtype::Float {
+                    width: merged_width,
+                    is_const: lhs_is_const,
+                }
+            }
+            (
+                ir::Dtype::Array {
+                    inner: lhs_inner,
+                    size: lhs_size,
+                },
+                ir::Dtype::Array {
+                    inner: rhs_inner,
+                    size: rhs_size,
+                },
+            ) => {
+                assert_eq!(
+                    lhs_size, rhs_size,
+                    "array from both side should have equal size"
+                );
+                let merged_inner = self.merge_dtype(&lhs_inner, &rhs_inner)?;
+                ir::Dtype::array(merged_inner, lhs_size)
+            }
+            (ir::Dtype::Struct { .. }, ir::Dtype::Struct { .. }) => {
+                todo!("can struct be used like this?")
+            }
+            (ir::Dtype::Function { .. }, ir::Dtype::Function { .. }) => {
+                todo!("can function be used like this?")
+            }
+            (ir::Dtype::Typedef { .. }, ir::Dtype::Typedef { .. }) => {
+                panic!("typedef can't be assigned")
+            }
+            (_, _) => {
+                return Err(IrgenErrorMessage::InvalidDtype {
+                    dtype_error: DtypeError::Misc {
+                        message: "both dtype should be the same to merge".to_string(),
+                    },
+                });
+            }
+        };
+
+        Ok(merged_dtype)
     }
 
     /// Translate the register value of an expression
