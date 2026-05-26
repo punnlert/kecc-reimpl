@@ -1268,7 +1268,7 @@ impl IrgenFunc<'_> {
                         None
                     };
 
-                    let _unused = self.translate_alloc(name, dtype.clone(), init_value, context)?;
+                    let _unused = self.translate_alloc(&name, &dtype, init_value, context)?;
                 }
                 ir::Dtype::Function { ret, params } => todo!(),
                 ir::Dtype::Typedef { name, is_const } => {
@@ -1360,7 +1360,59 @@ impl IrgenFunc<'_> {
 
         let merged_dtype = self.merge_dtype(&val_then.dtype(), &val_else.dtype())?;
 
-        todo!()
+        let val_then = self.translate_typecast(val_then, &merged_dtype, &mut context_then)?;
+        let val_else = self.translate_typecast(val_else, &merged_dtype, &mut context_else)?;
+
+        // allocates at the stack
+        //
+        // the idea is that
+        // conditional-jump c then_branch else_branch
+        //
+        // %t
+        //
+        // then_branch:
+        // store val_then %t
+        // j end
+        //
+        // else_branch:
+        // store val_else %t
+        // j end
+        //
+        // end:
+        // load %t
+        let temp_var = self.alloc_tempid();
+        let ptr = self.alloc_ptr(&temp_var, &merged_dtype)?;
+
+        // store at then
+        let _unused = context_then.insert_instruction(ir::Instruction::Store {
+            ptr: ptr.clone(),
+            value: val_then,
+        })?;
+
+        // conclude then
+        self.insert_block(
+            context_then,
+            ir::BlockExit::Jump {
+                arg: ir::JumpArg::new(bid_end, Vec::new()),
+            },
+        );
+
+        // store at else
+        let _unused = context_else.insert_instruction(ir::Instruction::Store {
+            ptr: ptr.clone(),
+            value: val_else,
+        })?;
+
+        // conclude else
+        self.insert_block(
+            context_else,
+            ir::BlockExit::Jump {
+                arg: ir::JumpArg::new(bid_end, Vec::new()),
+            },
+        );
+
+        // load at the end
+        context.insert_instruction(ir::Instruction::Load { ptr })
     }
 
     fn merge_dtype(
@@ -1612,10 +1664,22 @@ impl IrgenFunc<'_> {
         todo!()
     }
 
+    fn alloc_ptr(
+        &mut self,
+        var: &String,
+        dtype: &ir::Dtype,
+    ) -> Result<ir::Operand, IrgenErrorMessage> {
+        let aid = self.insert_alloc(Named::new(Some(var.clone()), dtype.clone()));
+        let pointer_type = ir::Dtype::pointer(dtype.clone());
+        let ptr = ir::Operand::register(aid, pointer_type);
+        self.insert_symbol_table_entry(var.to_string(), ptr.clone())?;
+        Ok(ptr)
+    }
+
     fn translate_alloc(
         &mut self,
-        var: String,
-        dtype: ir::Dtype,
+        var: &String,
+        dtype: &ir::Dtype,
         value: Option<ir::Operand>,
         context: &mut Context,
     ) -> Result<ir::Operand, IrgenErrorMessage> {
@@ -1634,7 +1698,7 @@ impl IrgenFunc<'_> {
         // the type of the pointer is a pointer to the type of the allocated data
         let pointer_type = ir::Dtype::pointer(dtype.clone());
         let ptr = ir::Operand::register(aid, pointer_type);
-        self.insert_symbol_table_entry(var, ptr.clone())?;
+        self.insert_symbol_table_entry(var.to_string(), ptr.clone())?;
 
         // if the allocation also assign some values to the allocation then we need to store it
         if let Some(value) = value {
