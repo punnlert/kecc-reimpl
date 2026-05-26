@@ -598,6 +598,7 @@ impl IrgenFunc<'_> {
         Ok(())
     }
 
+    /// [SELF]
     ///  Get the allocation to the variable with name var
     fn lookup_symbol_table_entry(
         &mut self,
