@@ -1696,6 +1696,12 @@ impl IrgenFunc<'_> {
         }
     }
 
+    /// [SELF] implemented myself
+    /// get the pointer to the array
+    fn translate_array_pointer(&self, array: &ir::Dtype) -> Result<ir::Operand, IrgenErrorMessage> {
+        todo!()
+    }
+
     /// Translate initial parameter declarations of the functions to IR.
     ///
     /// For example, given the following C function from [`foo.c`][foo]:
