@@ -1753,12 +1753,17 @@ impl IrgenFunc<'_> {
     ) -> Result<(), IrgenErrorMessage> {
         // aid is allocation id
         for (aid, (dtype, var_name)) in izip!(&signature.params, name_of_params).enumerate() {
+            // [SELF] check later
+            // this is the register that should be allocate
             let value = Some(ir::Operand::register(
                 ir::RegisterId::arg(bid_init, aid),
                 dtype.clone(),
             ));
+
+            // this block also stores value
+            let _unused = self.translate_alloc(var_name, &dtype, value, context)?;
         }
-        todo!()
+        Ok(())
     }
 
     fn alloc_ptr(
