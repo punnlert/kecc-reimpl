@@ -1584,7 +1584,19 @@ impl IrgenFunc<'_> {
                     ir::Dtype::LONG.set_signed(false),
                 )))
             }
-            Expression::SizeOfVal(node) => todo!(),
+            Expression::SizeOfVal(expr) => {
+                // [SELF] translating the expr first then look at its dtype
+                let rval = self.translate_expr_rvalue(&expr.node.0.node, context)?;
+                let dtype = rval.dtype();
+                let (size_of, _) = dtype
+                    .size_align_of(self.structs)
+                    .map_err(|e| IrgenErrorMessage::InvalidDtype { dtype_error: e })?;
+
+                Ok(ir::Operand::Constant(ir::Constant::int(
+                    size_of as u128,
+                    ir::Dtype::LONG.set_signed(false),
+                )))
+            }
             Expression::AlignOf(type_name) => {
                 let dtype = ir::Dtype::try_from(&type_name.node.0.node)
                     .map_err(|e| IrgenErrorMessage::InvalidDtype { dtype_error: e })?;
