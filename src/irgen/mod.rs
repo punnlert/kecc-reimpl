@@ -1551,7 +1551,12 @@ impl IrgenFunc<'_> {
                 }
 
                 if let Some(array_inner) = ptr_inner_dtype.get_array_inner() {
-                    todo!("return convert array to pointer")
+                    // [SELF] not sure how to do this
+                    // maybe recursion to see if the inner is array. go until not array
+                    // use the pointer at the last. but is it ok?
+                    // return self.translate_array_pointer(array_inner);
+                    // for now return the pointer. why not?
+                    return Ok(ptr);
                 }
 
                 // this function insert instruction into the current context AND assign it to a
