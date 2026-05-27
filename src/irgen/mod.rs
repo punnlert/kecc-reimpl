@@ -1720,7 +1720,9 @@ impl IrgenFunc<'_> {
 
                 self.translate_typecast(operand, &target_dtype, context)
             }
-            Expression::BinaryOperator(node) => todo!(),
+            Expression::BinaryOperator(binop_expr) => {
+                self.translate_binary_operator_expression(&binop_expr.node, context)
+            }
             Expression::Conditional(cond) => self.translate_conditional(&cond.node, context),
             Expression::Comma(nodes) => todo!(),
             Expression::OffsetOf(node) => todo!(),
