@@ -1521,6 +1521,99 @@ impl IrgenFunc<'_> {
         Ok(merged_dtype)
     }
 
+    fn translate_binary_operator_expression(
+        &mut self,
+        binop_expr: &BinaryOperatorExpression,
+        context: &mut Context,
+    ) -> Result<ir::Operand, IrgenErrorMessage> {
+        let lhs_rvalue = self.translate_expr_rvalue(&binop_expr.lhs.node, context)?;
+        let rhs_rvalue = self.translate_expr_rvalue(&binop_expr.rhs.node, context)?;
+
+        //[SELF] this is array indexing might need to fix this later
+        if binop_expr.operator.node.is_equiv(&BinaryOperator::Index) {
+            let inner_dtype = lhs_rvalue
+                .dtype()
+                .get_array_inner()
+                .ok_or_else(|| IrgenErrorMessage::InvalidDtype {
+                    dtype_error: DtypeError::Misc {
+                        message: "only array can use the index operator".to_string(),
+                    },
+                })?
+                .clone();
+
+            // its byte address so
+            // index * 4 bytes (the size of i32)
+
+            let offset: ir::Operand = context.insert_instruction(ir::Instruction::BinOp {
+                op: BinaryOperator::Multiply,
+                lhs: ir::Operand::constant(ir::Constant::int(4, ir::Dtype::INT)),
+                rhs: rhs_rvalue,
+                dtype: ir::Dtype::INT,
+            })?;
+
+            return context.insert_instruction(ir::Instruction::GetElementPtr {
+                ptr: lhs_rvalue.clone(),
+                offset: offset.clone(),
+                dtype: inner_dtype.clone(),
+            });
+        }
+
+        // [TODO] translate typecast according to the write up
+        let dtype = self.resolve_type_binop(&lhs_rvalue.dtype(), &rhs_rvalue.dtype())?;
+
+        let lhs_rvalue = self.translate_typecast(lhs_rvalue, &dtype, context)?;
+        let rhs_rvalue = self.translate_typecast(rhs_rvalue, &dtype, context)?;
+
+        match &binop_expr.operator.node {
+            BinaryOperator::Index => panic!("why is index not resolved now???"),
+            BinaryOperator::Multiply => todo!(),
+            BinaryOperator::Divide => todo!(),
+            BinaryOperator::Modulo => todo!(),
+            BinaryOperator::Plus => todo!(),
+            BinaryOperator::Minus => todo!(),
+            BinaryOperator::ShiftLeft => todo!(),
+            BinaryOperator::ShiftRight => todo!(),
+            BinaryOperator::BitwiseAnd => todo!(),
+            BinaryOperator::BitwiseXor => todo!(),
+            BinaryOperator::BitwiseOr => todo!(),
+            BinaryOperator::Less => todo!(),
+            BinaryOperator::Greater => todo!(),
+            BinaryOperator::LessOrEqual => todo!(),
+            BinaryOperator::GreaterOrEqual => todo!(),
+            BinaryOperator::Equals => todo!(),
+            BinaryOperator::NotEquals => todo!(),
+            BinaryOperator::LogicalAnd => todo!(),
+            BinaryOperator::LogicalOr => todo!(),
+            BinaryOperator::Assign => todo!(),
+            BinaryOperator::AssignMultiply => todo!(),
+            BinaryOperator::AssignDivide => todo!(),
+            BinaryOperator::AssignModulo => todo!(),
+            BinaryOperator::AssignPlus => todo!(),
+            BinaryOperator::AssignMinus => todo!(),
+            BinaryOperator::AssignShiftLeft => todo!(),
+            BinaryOperator::AssignShiftRight => todo!(),
+            BinaryOperator::AssignBitwiseAnd => todo!(),
+            BinaryOperator::AssignBitwiseXor => todo!(),
+            BinaryOperator::AssignBitwiseOr => todo!(),
+        }
+    }
+
+    fn integer_promotions(
+        &self,
+        integer: ir::Operand,
+        context: &mut Context,
+    ) -> Result<ir::Operand, IrgenErrorMessage> {
+        todo!()
+    }
+
+    fn resolve_type_binop(
+        &self,
+        lhs_dtype: &ir::Dtype,
+        rhs_dtype: &ir::Dtype,
+    ) -> Result<ir::Dtype, IrgenErrorMessage> {
+        todo!()
+    }
+
     /// Translate the register value of an expression
     /// e.g.
     /// y = x + 3
