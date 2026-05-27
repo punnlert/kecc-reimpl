@@ -1599,11 +1599,34 @@ impl IrgenFunc<'_> {
     }
 
     fn integer_promotions(
-        &self,
+        &mut self,
         integer: ir::Operand,
         context: &mut Context,
     ) -> Result<ir::Operand, IrgenErrorMessage> {
-        todo!()
+        let integer_const =
+            integer
+                .get_constant()
+                .ok_or_else(|| IrgenErrorMessage::InvalidDtype {
+                    dtype_error: DtypeError::Misc {
+                        message: "should be integer constant".to_string(),
+                    },
+                })?;
+
+        match integer_const {
+            ir::Constant::Int {
+                value,
+                width,
+                is_signed,
+            } => {
+                let int_width = ir::Dtype::INT.get_int_width().unwrap();
+                if width < &int_width {
+                    return self.translate_typecast(integer, &ir::Dtype::INT, context);
+                } else {
+                    return Ok(integer);
+                }
+            }
+            _ => panic!("only integer allowed"),
+        }
     }
 
     fn resolve_type_binop(
