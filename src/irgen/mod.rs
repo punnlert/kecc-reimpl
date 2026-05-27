@@ -1647,9 +1647,7 @@ impl IrgenFunc<'_> {
                     // [SELF] not sure how to do this
                     // maybe recursion to see if the inner is array. go until not array
                     // use the pointer at the last. but is it ok?
-                    // return self.translate_array_pointer(array_inner);
-                    // for now return the pointer. why not?
-                    return Ok(ptr);
+                    return self.translate_array_pointer(&ptr, &array_inner, context);
                 }
 
                 // this function insert instruction into the current context AND assign it to a
@@ -1791,8 +1789,17 @@ impl IrgenFunc<'_> {
 
     /// [SELF] implemented myself
     /// get the pointer to the array
-    fn translate_array_pointer(&self, array: &ir::Dtype) -> Result<ir::Operand, IrgenErrorMessage> {
-        todo!()
+    fn translate_array_pointer(
+        &self,
+        ptr: &ir::Operand,
+        dtype: &ir::Dtype,
+        context: &mut Context,
+    ) -> Result<ir::Operand, IrgenErrorMessage> {
+        context.insert_instruction(ir::Instruction::GetElementPtr {
+            ptr: ptr.clone(),
+            offset: ir::Operand::constant(ir::Constant::int(0, ir::Dtype::INT)),
+            dtype: dtype.clone(),
+        })
     }
 
     /// Translate initial parameter declarations of the functions to IR.
