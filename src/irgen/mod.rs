@@ -1257,7 +1257,13 @@ impl IrgenFunc<'_> {
             let name = name_of_declarator(declarator);
 
             match dtype {
-                ir::Dtype::Unit { is_const } => todo!(),
+                ir::Dtype::Unit { is_const } => {
+                    return Err(IrgenErrorMessage::InvalidDtype {
+                        dtype_error: DtypeError::Misc {
+                            message: "can't declare thing with type `void`".to_string(),
+                        },
+                    });
+                }
                 ir::Dtype::Int { .. }
                 | ir::Dtype::Float { .. }
                 | ir::Dtype::Pointer { .. }
