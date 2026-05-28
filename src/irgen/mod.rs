@@ -1535,37 +1535,168 @@ impl IrgenFunc<'_> {
         binop_expr: &BinaryOperatorExpression,
         context: &mut Context,
     ) -> Result<ir::Operand, IrgenErrorMessage> {
+        if binop_expr.operator.node.is_equiv(&BinaryOperator::Assign) {
+            let ptr = self.translate_expr_lvalue(&binop_expr.lhs.node, context)?;
+            let value = self.translate_expr_rvalue(&binop_expr.rhs.node, context)?;
+            return self.translate_assign_operation(&ptr, &value, context);
+        }
+
         let lhs_rvalue = self.translate_expr_rvalue(&binop_expr.lhs.node, context)?;
         let rhs_rvalue = self.translate_expr_rvalue(&binop_expr.rhs.node, context)?;
 
         //[SELF] this is array indexing might need to fix this later
-        if binop_expr.operator.node.is_equiv(&BinaryOperator::Index) {
-            let inner_dtype = lhs_rvalue
-                .dtype()
-                .get_array_inner()
-                .ok_or_else(|| IrgenErrorMessage::InvalidDtype {
-                    dtype_error: DtypeError::Misc {
-                        message: "only array can use the index operator".to_string(),
-                    },
-                })?
-                .clone();
+        match &binop_expr.operator.node {
+            BinaryOperator::Index => {
+                let inner_dtype = lhs_rvalue
+                    .dtype()
+                    .get_array_inner()
+                    .ok_or_else(|| IrgenErrorMessage::InvalidDtype {
+                        dtype_error: DtypeError::Misc {
+                            message: "only array can use the index operator".to_string(),
+                        },
+                    })?
+                    .clone();
 
-            // its byte address so
-            // index * 4 bytes (the size of i32)
+                // its byte address so
+                // index * 4 bytes (the size of i32)
 
-            let offset: ir::Operand = context.insert_instruction(ir::Instruction::BinOp {
-                op: BinaryOperator::Multiply,
-                lhs: ir::Operand::constant(ir::Constant::int(4, ir::Dtype::INT)),
-                rhs: rhs_rvalue,
-                dtype: ir::Dtype::INT,
-            })?;
+                let offset = context.insert_instruction(ir::Instruction::BinOp {
+                    op: BinaryOperator::Multiply,
+                    lhs: ir::Operand::constant(ir::Constant::int(4, ir::Dtype::INT)),
+                    rhs: rhs_rvalue,
+                    dtype: ir::Dtype::INT,
+                })?;
 
-            return context.insert_instruction(ir::Instruction::GetElementPtr {
-                ptr: lhs_rvalue.clone(),
-                offset: offset.clone(),
-                dtype: inner_dtype.clone(),
-            });
+                let ptr = context.insert_instruction(ir::Instruction::GetElementPtr {
+                    ptr: lhs_rvalue.clone(),
+                    offset: offset.clone(),
+                    dtype: inner_dtype.clone(),
+                })?;
+
+                context.insert_instruction(ir::Instruction::Load { ptr })
+            }
+            BinaryOperator::Multiply
+            | BinaryOperator::Divide
+            | BinaryOperator::Modulo
+            | BinaryOperator::Plus
+            | BinaryOperator::Minus => {
+                let (lhs_converted, rhs_converted, dtype) =
+                    self.arithmatic_conversion(lhs_rvalue, rhs_rvalue, context)?;
+
+                context.insert_instruction(ir::Instruction::BinOp {
+                    op: binop_expr.operator.node.clone(),
+                    lhs: lhs_converted,
+                    rhs: rhs_converted,
+                    dtype,
+                })
+            }
+            BinaryOperator::ShiftLeft
+            | BinaryOperator::ShiftRight
+            | BinaryOperator::BitwiseAnd
+            | BinaryOperator::BitwiseXor
+            | BinaryOperator::BitwiseOr => {
+                let lhs_promote = self.integer_promotions(lhs_rvalue, context)?;
+                let rhs_promote = self.integer_promotions(rhs_rvalue, context)?;
+
+                let dtype = lhs_promote.dtype();
+
+                context.insert_instruction(ir::Instruction::BinOp {
+                    op: binop_expr.operator.node.clone(),
+                    lhs: lhs_promote,
+                    rhs: rhs_promote,
+                    dtype,
+                })
+            }
+            BinaryOperator::Less
+            | BinaryOperator::Greater
+            | BinaryOperator::LessOrEqual
+            | BinaryOperator::GreaterOrEqual
+            | BinaryOperator::Equals
+            | BinaryOperator::NotEquals => {
+                let (lhs_converted, rhs_converted, dtype) =
+                    self.arithmatic_conversion(lhs_rvalue, rhs_rvalue, context)?;
+
+                context.insert_instruction(ir::Instruction::BinOp {
+                    op: binop_expr.operator.node.clone(),
+                    lhs: lhs_converted,
+                    rhs: rhs_converted,
+                    dtype: ir::Dtype::BOOL,
+                })
+
+                // self.translate_typecast(reg, &ir::Dtype::BOOL, context)
+            }
+            BinaryOperator::LogicalAnd | BinaryOperator::LogicalOr => {
+                let lhs_bool = self.translate_typecast_to_bool(lhs_rvalue, context)?;
+                let rhs_bool = self.translate_typecast_to_bool(rhs_rvalue, context)?;
+
+                context.insert_instruction(ir::Instruction::BinOp {
+                    op: binop_expr.operator.node.clone(),
+                    lhs: lhs_bool,
+                    rhs: rhs_bool,
+                    dtype: ir::Dtype::BOOL,
+                })
+            }
+            BinaryOperator::Assign => {
+                panic!("Assign should be resolved by now")
+            }
+            BinaryOperator::AssignMultiply
+            | BinaryOperator::AssignDivide
+            | BinaryOperator::AssignModulo
+            | BinaryOperator::AssignPlus
+            | BinaryOperator::AssignMinus => {
+                let op = match &binop_expr.operator.node {
+                    BinaryOperator::AssignMultiply => BinaryOperator::Multiply,
+                    BinaryOperator::AssignDivide => BinaryOperator::Divide,
+                    BinaryOperator::AssignModulo => BinaryOperator::Modulo,
+                    BinaryOperator::AssignPlus => BinaryOperator::Plus,
+                    BinaryOperator::AssignMinus => BinaryOperator::Minus,
+                    _ => panic!("how did you get here"),
+                };
+
+                let (lhs_converted, rhs_converted, dtype) =
+                    self.arithmatic_conversion(lhs_rvalue, rhs_rvalue, context)?;
+
+                let value = context.insert_instruction(ir::Instruction::BinOp {
+                    op,
+                    lhs: lhs_converted,
+                    rhs: rhs_converted,
+                    dtype,
+                })?;
+
+                let ptr = self.translate_expr_lvalue(&binop_expr.lhs.node, context)?;
+
+                self.translate_assign_operation(&ptr, &value, context)
+            }
+            BinaryOperator::AssignShiftLeft
+            | BinaryOperator::AssignShiftRight
+            | BinaryOperator::AssignBitwiseAnd
+            | BinaryOperator::AssignBitwiseXor
+            | BinaryOperator::AssignBitwiseOr => {
+                let op = match &binop_expr.operator.node {
+                    BinaryOperator::AssignShiftLeft => BinaryOperator::ShiftLeft,
+                    BinaryOperator::AssignShiftRight => BinaryOperator::ShiftRight,
+                    BinaryOperator::AssignBitwiseAnd => BinaryOperator::BitwiseAnd,
+                    BinaryOperator::AssignBitwiseXor => BinaryOperator::BitwiseXor,
+                    BinaryOperator::AssignBitwiseOr => BinaryOperator::BitwiseOr,
+                    _ => panic!("how did you get here"),
+                };
+                let lhs_promote = self.integer_promotions(lhs_rvalue, context)?;
+                let rhs_promote = self.integer_promotions(rhs_rvalue, context)?;
+
+                let dtype = lhs_promote.dtype();
+
+                let value = context.insert_instruction(ir::Instruction::BinOp {
+                    op,
+                    lhs: lhs_promote,
+                    rhs: rhs_promote,
+                    dtype,
+                })?;
+
+                let ptr = self.translate_expr_lvalue(&binop_expr.lhs.node, context)?;
+                self.translate_assign_operation(&ptr, &value, context)
+            }
         }
+    }
 
         // [TODO] translate typecast according to the write up
         let dtype = self.resolve_type_binop(&lhs_rvalue.dtype(), &rhs_rvalue.dtype())?;
