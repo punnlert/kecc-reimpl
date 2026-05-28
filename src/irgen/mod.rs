@@ -1995,7 +1995,37 @@ impl IrgenFunc<'_> {
                 // only support binary op when its array indexing
                 match expr.node.operator.node {
                     BinaryOperator::Index => {
-                        todo!("translating indexing operator");
+                        let lhs_rvalue =
+                            self.translate_expr_rvalue(&expr.node.lhs.node, context)?;
+
+                        let rhs_rvalue =
+                            self.translate_expr_rvalue(&expr.node.rhs.node, context)?;
+
+                        let inner_dtype = lhs_rvalue
+                            .dtype()
+                            .get_array_inner()
+                            .ok_or_else(|| IrgenErrorMessage::InvalidDtype {
+                                dtype_error: DtypeError::Misc {
+                                    message: "only array can use the index operator".to_string(),
+                                },
+                            })?
+                            .clone();
+
+                        // its byte address so
+                        // index * 4 bytes (the size of i32)
+
+                        let offset = context.insert_instruction(ir::Instruction::BinOp {
+                            op: BinaryOperator::Multiply,
+                            lhs: ir::Operand::constant(ir::Constant::int(4, ir::Dtype::INT)),
+                            rhs: rhs_rvalue,
+                            dtype: ir::Dtype::INT,
+                        })?;
+
+                        context.insert_instruction(ir::Instruction::GetElementPtr {
+                            ptr: lhs_rvalue.clone(),
+                            offset: offset.clone(),
+                            dtype: inner_dtype.clone(),
+                        })
                     }
                     _ => panic!(
                         "can't use binary operator as a destination to value except indexing"
