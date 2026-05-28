@@ -919,7 +919,6 @@ impl IrgenFunc<'_> {
 
                 Ok(())
             }
-            Statement::Goto(node) => todo!(),
             Statement::Continue => {
                 // if there is a continue then there should be a continuation block
                 let bid_cont = bid_continue.ok_or_else(|| {
