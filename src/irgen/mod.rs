@@ -1530,6 +1530,26 @@ impl IrgenFunc<'_> {
         Ok(merged_dtype)
     }
 
+    fn translate_assign_operation(
+        &mut self,
+        ptr: &ir::Operand,
+        value: &ir::Operand,
+        context: &mut Context,
+    ) -> Result<ir::Operand, IrgenErrorMessage> {
+        let dtype = ptr
+            .dtype()
+            .get_pointer_inner()
+            .ok_or_else(|| panic!("l value should return pointer"))?
+            .clone();
+
+        let value = self.translate_typecast(value.clone(), &dtype, context)?;
+
+        context.insert_instruction(ir::Instruction::Store {
+            ptr: ptr.clone(),
+            value,
+        })
+    }
+
     fn translate_binary_operator_expression(
         &mut self,
         binop_expr: &BinaryOperatorExpression,
