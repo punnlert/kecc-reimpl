@@ -974,13 +974,17 @@ impl IrgenFunc<'_> {
                 // value there. I guess if there is no value then i just return unit type.
                 let bid_next = self.alloc_bid();
                 let value = if let Some(ret_val) = &val {
-                    let ret_rvalue = self
-                        .translate_expr_rvalue(&ret_val.node, context)
-                        .map_err(|e| IrgenError::new(ret_val.write_string(), e))?;
-                    ret_rvalue
+                    self.translate_expr_rvalue(&ret_val.node, context)
+                        .map_err(|e| IrgenError::new(ret_val.write_string(), e))?
                 } else {
                     ir::Operand::Constant(ir::Constant::unit())
                 };
+
+                // implicit type cast
+                let value = self
+                    .translate_typecast(value, &self.return_type.clone(), context)
+                    .map_err(|e| IrgenError::new(val.write_string(), e))?;
+
                 self.insert_block(
                     mem::replace(context, Context::new(bid_next)),
                     ir::BlockExit::Return { value },
