@@ -1442,7 +1442,9 @@ impl IrgenFunc<'_> {
             .map_err(|e| IrgenErrorMessage::InvalidDtype { dtype_error: e })?;
 
         let merged_dtype = match (lhs_dtype.clone(), rhs_dtype.clone()) {
-            (ir::Dtype::Unit { .. }, ir::Dtype::Unit { .. }) => todo!("can you merge a unit type?"),
+            (ir::Dtype::Unit { .. }, ir::Dtype::Unit { .. }) => {
+                panic!("can you merge a unit type?")
+            }
             (
                 ir::Dtype::Int {
                     width: lhs_width,
@@ -1510,10 +1512,10 @@ impl IrgenFunc<'_> {
                 ir::Dtype::array(merged_inner, lhs_size)
             }
             (ir::Dtype::Struct { .. }, ir::Dtype::Struct { .. }) => {
-                todo!("can struct be used like this?")
+                panic!("can struct be used like this?")
             }
             (ir::Dtype::Function { .. }, ir::Dtype::Function { .. }) => {
-                todo!("can function be used like this?")
+                panic!("can function be used like this?")
             }
             (ir::Dtype::Typedef { .. }, ir::Dtype::Typedef { .. }) => {
                 panic!("typedef can't be assigned")
