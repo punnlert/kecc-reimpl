@@ -1844,14 +1844,6 @@ impl IrgenFunc<'_> {
         }
     }
 
-    fn resolve_type_binop(
-        &self,
-        lhs_dtype: &ir::Dtype,
-        rhs_dtype: &ir::Dtype,
-    ) -> Result<ir::Dtype, IrgenErrorMessage> {
-        todo!()
-    }
-
     /// Translate the register value of an expression
     /// e.g.
     /// y = x + 3
@@ -1920,6 +1912,7 @@ impl IrgenFunc<'_> {
                 // [SELF] translating the expr first then look at its dtype
                 let rval = self.translate_expr_rvalue(&expr.node.0.node, context)?;
                 let dtype = rval.dtype();
+                // this is not the way bro
                 let (size_of, _) = dtype
                     .size_align_of(self.structs)
                     .map_err(|e| IrgenErrorMessage::InvalidDtype { dtype_error: e })?;
