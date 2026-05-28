@@ -1603,14 +1603,11 @@ impl IrgenFunc<'_> {
         integer: ir::Operand,
         context: &mut Context,
     ) -> Result<ir::Operand, IrgenErrorMessage> {
-        let integer_const =
-            integer
-                .get_constant()
-                .ok_or_else(|| IrgenErrorMessage::InvalidDtype {
-                    dtype_error: DtypeError::Misc {
-                        message: "should be integer constant".to_string(),
-                    },
-                })?;
+        let integer_const = integer
+            .get_constant()
+            .ok_or_else(|| IrgenErrorMessage::Misc {
+                message: "should be integer constant".to_string(),
+            })?;
 
         match integer_const {
             ir::Constant::Int {
