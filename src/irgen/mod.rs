@@ -1690,10 +1690,8 @@ impl IrgenFunc<'_> {
                 Ok(ir::Operand::Constant(constant))
             }
             Expression::StringLiteral(_string_lit) => todo!(),
-            Expression::GenericSelection(node) => todo!(),
             Expression::Member(node) => todo!(),
             Expression::Call(call_expr) => self.translate_func_call(&call_expr.node, context),
-            Expression::CompoundLiteral(node) => todo!(),
             Expression::SizeOfTy(type_name) => {
                 let dtype = ir::Dtype::try_from(&type_name.node.0.node)
                     .map_err(|e| IrgenErrorMessage::InvalidDtype { dtype_error: e })?;
@@ -1753,10 +1751,7 @@ impl IrgenFunc<'_> {
                 self.translate_binary_operator_expression(&binop_expr.node, context)
             }
             Expression::Conditional(cond) => self.translate_conditional(&cond.node, context),
-            Expression::Comma(nodes) => todo!(),
-            Expression::OffsetOf(node) => todo!(),
-            Expression::VaArg(node) => todo!(),
-            Expression::Statement(node) => todo!(),
+            _ => panic!("unsupported"),
         }
     }
 
