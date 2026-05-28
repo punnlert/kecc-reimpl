@@ -1718,44 +1718,100 @@ impl IrgenFunc<'_> {
         }
     }
 
-        // [TODO] translate typecast according to the write up
-        let dtype = self.resolve_type_binop(&lhs_rvalue.dtype(), &rhs_rvalue.dtype())?;
+    /// convert lhs and rhs according to the dtype rule
+    fn arithmatic_conversion(
+        &mut self,
+        lhs: ir::Operand,
+        rhs: ir::Operand,
+        context: &mut Context,
+    ) -> Result<(ir::Operand, ir::Operand, ir::Dtype), IrgenErrorMessage> {
+        match (lhs.dtype(), rhs.dtype()) {
+            (ir::Dtype::DOUBLE, _) => {
+                if (rhs.dtype() == ir::Dtype::DOUBLE) {
+                    return Ok((lhs, rhs, ir::Dtype::DOUBLE));
+                } else {
+                    let new_rhs =
+                        self.translate_typecast(rhs.clone(), &ir::Dtype::DOUBLE, context)?;
+                    return Ok((lhs, new_rhs.clone(), ir::Dtype::DOUBLE));
+                }
+            }
+            (_, ir::Dtype::DOUBLE) => {
+                if (lhs.dtype() == ir::Dtype::DOUBLE) {
+                    return Ok((lhs, rhs, ir::Dtype::DOUBLE));
+                } else {
+                    let new_lhs =
+                        self.translate_typecast(lhs.clone(), &ir::Dtype::DOUBLE, context)?;
+                    return Ok((new_lhs.clone(), rhs, ir::Dtype::DOUBLE));
+                }
+            }
+            (ir::Dtype::FLOAT, _) => {
+                if (rhs.dtype() == ir::Dtype::FLOAT) {
+                    return Ok((lhs, rhs, ir::Dtype::FLOAT));
+                } else {
+                    let new_rhs =
+                        self.translate_typecast(rhs.clone(), &ir::Dtype::FLOAT, context)?;
+                    return Ok((lhs, new_rhs.clone(), ir::Dtype::FLOAT));
+                }
+            }
+            (_, ir::Dtype::FLOAT) => {
+                if (lhs.dtype() == ir::Dtype::FLOAT) {
+                    return Ok((lhs, rhs, ir::Dtype::FLOAT));
+                } else {
+                    let new_lhs =
+                        self.translate_typecast(lhs.clone(), &ir::Dtype::FLOAT, context)?;
+                    return Ok((new_lhs.clone(), rhs, ir::Dtype::FLOAT));
+                }
+            }
+            (ir::Dtype::Int { .. }, ir::Dtype::Int { .. }) => {
+                let lhs_type_convert = self.integer_promotions(lhs, context)?;
+                let rhs_type_convert = self.integer_promotions(rhs, context)?;
 
-        let lhs_rvalue = self.translate_typecast(lhs_rvalue, &dtype, context)?;
-        let rhs_rvalue = self.translate_typecast(rhs_rvalue, &dtype, context)?;
+                let lhs_dtype = lhs_type_convert.dtype();
+                let rhs_dtype = rhs_type_convert.dtype();
 
-        match &binop_expr.operator.node {
-            BinaryOperator::Index => panic!("why is index not resolved now???"),
-            BinaryOperator::Multiply => todo!(),
-            BinaryOperator::Divide => todo!(),
-            BinaryOperator::Modulo => todo!(),
-            BinaryOperator::Plus => todo!(),
-            BinaryOperator::Minus => todo!(),
-            BinaryOperator::ShiftLeft => todo!(),
-            BinaryOperator::ShiftRight => todo!(),
-            BinaryOperator::BitwiseAnd => todo!(),
-            BinaryOperator::BitwiseXor => todo!(),
-            BinaryOperator::BitwiseOr => todo!(),
-            BinaryOperator::Less => todo!(),
-            BinaryOperator::Greater => todo!(),
-            BinaryOperator::LessOrEqual => todo!(),
-            BinaryOperator::GreaterOrEqual => todo!(),
-            BinaryOperator::Equals => todo!(),
-            BinaryOperator::NotEquals => todo!(),
-            BinaryOperator::LogicalAnd => todo!(),
-            BinaryOperator::LogicalOr => todo!(),
-            BinaryOperator::Assign => todo!(),
-            BinaryOperator::AssignMultiply => todo!(),
-            BinaryOperator::AssignDivide => todo!(),
-            BinaryOperator::AssignModulo => todo!(),
-            BinaryOperator::AssignPlus => todo!(),
-            BinaryOperator::AssignMinus => todo!(),
-            BinaryOperator::AssignShiftLeft => todo!(),
-            BinaryOperator::AssignShiftRight => todo!(),
-            BinaryOperator::AssignBitwiseAnd => todo!(),
-            BinaryOperator::AssignBitwiseXor => todo!(),
-            BinaryOperator::AssignBitwiseOr => todo!(),
+                if (lhs_dtype == rhs_dtype) {
+                    return Ok((lhs_type_convert, rhs_type_convert, lhs_dtype));
+                }
+
+                // get the biggest width
+                let convert_width = lhs_dtype
+                    .get_int_width()
+                    .max(rhs_dtype.get_int_width())
+                    .unwrap();
+
+                // if both has the same signed
+                if (lhs_dtype.is_int_signed() == rhs_dtype.is_int_signed()) {
+                    let is_signed = lhs_dtype.is_int_signed();
+                    let dtype = ir::Dtype::Int {
+                        width: convert_width,
+                        is_signed,
+                        is_const: false,
+                    };
+
+                    let new_lhs = self.translate_typecast(lhs_type_convert, &dtype, context)?;
+                    let new_rhs = self.translate_typecast(rhs_type_convert, &dtype, context)?;
+
+                    return Ok((new_lhs, new_rhs, dtype));
+                }
+
+                // lhs width is wider
+                if (lhs_dtype.get_int_width().unwrap() == convert_width) {
+                    let new_rhs = self.translate_typecast(rhs_type_convert, &lhs_dtype, context)?;
+
+                    return Ok((lhs_type_convert, new_rhs, lhs_dtype));
+                }
+
+                if (rhs_dtype.get_int_width().unwrap() == convert_width) {
+                    let new_lhs = self.translate_typecast(lhs_type_convert, &rhs_dtype, context)?;
+
+                    return Ok((new_lhs, rhs_type_convert, rhs_dtype));
+                };
+            }
+            (_, _) => panic!("only arithmatic type for arithmatic conversion"),
         }
+        Err(IrgenErrorMessage::Misc {
+            message: "should have resolved everything by now".to_string(),
+        })
     }
 
     fn integer_promotions(
