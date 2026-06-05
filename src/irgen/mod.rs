@@ -1281,8 +1281,14 @@ impl IrgenFunc<'_> {
 
                     let _unused = self.translate_alloc(&name, &dtype, init_value, context)?;
                 }
-                ir::Dtype::Function { ret, params } => todo!(),
-                ir::Dtype::Typedef { name, is_const } => {
+                ir::Dtype::Function { .. } => {
+                    return Err(IrgenErrorMessage::InvalidDtype {
+                        dtype_error: DtypeError::Misc {
+                            message: "can't declare function inside a function".to_string(),
+                        },
+                    });
+                }
+                ir::Dtype::Typedef { .. } => {
                     panic!("typedefs should be resolved by now")
                 }
             }
@@ -1914,7 +1920,6 @@ impl IrgenFunc<'_> {
                 // [SELF] translating the expr first then look at its dtype
                 let rval = self.translate_expr_rvalue(&expr.node.0.node, context)?;
                 let dtype = rval.dtype();
-                // this is not the way bro
                 let (size_of, _) = dtype
                     .size_align_of(self.structs)
                     .map_err(|e| IrgenErrorMessage::InvalidDtype { dtype_error: e })?;
