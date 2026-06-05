@@ -1872,6 +1872,82 @@ impl IrgenFunc<'_> {
         }
     }
 
+    fn translate_unary_expression(
+        &mut self,
+        unary_expr: &UnaryOperatorExpression,
+        context: &mut Context,
+    ) -> Result<ir::Operand, IrgenErrorMessage> {
+        let op = unary_expr.operator.node.clone();
+        let operand = self.translate_expr_rvalue(&unary_expr.operand.node, context)?;
+        let dtype = operand.dtype();
+        match &unary_expr.operator.node {
+            UnaryOperator::Plus | UnaryOperator::Minus => {
+                let operand = self.integer_promotions(operand, context)?;
+                context.insert_instruction(ir::Instruction::UnaryOp { op, operand, dtype })
+            }
+
+            UnaryOperator::Negate => {
+                context.insert_instruction(ir::Instruction::UnaryOp { op, operand, dtype })
+            }
+
+            UnaryOperator::PostIncrement => {
+                let ptr = self.translate_expr_lvalue(&unary_expr.operand.node, context)?;
+                let inc_operand = context.insert_instruction(ir::Instruction::BinOp {
+                    op: BinaryOperator::Plus,
+                    lhs: operand.clone(),
+                    rhs: ir::Operand::constant(ir::Constant::int(1, ir::Dtype::INT)),
+                    dtype,
+                })?;
+
+                // put the incremented value back into the id
+                let _unused = self.translate_assign_operation(&ptr, &inc_operand, context)?;
+
+                // didnt return incremented value just return the previous value
+                Ok(operand)
+            }
+
+            UnaryOperator::PostDecrement => {
+                let ptr = self.translate_expr_lvalue(&unary_expr.operand.node, context)?;
+                let dec_operand = context.insert_instruction(ir::Instruction::BinOp {
+                    op: BinaryOperator::Minus,
+                    lhs: operand.clone(),
+                    rhs: ir::Operand::constant(ir::Constant::int(1, ir::Dtype::INT)),
+                    dtype,
+                })?;
+                let _unused = self.translate_assign_operation(&ptr, &dec_operand, context)?;
+                Ok(operand)
+            }
+
+            UnaryOperator::PreIncrement => {
+                let ptr = self.translate_expr_lvalue(&unary_expr.operand.node, context)?;
+                let inc_operand = context.insert_instruction(ir::Instruction::BinOp {
+                    op: BinaryOperator::Plus,
+                    lhs: operand.clone(),
+                    rhs: ir::Operand::constant(ir::Constant::int(1, ir::Dtype::INT)),
+                    dtype,
+                })?;
+                let _unused = self.translate_assign_operation(&ptr, &inc_operand, context)?;
+                Ok(inc_operand)
+            }
+
+            UnaryOperator::PreDecrement => {
+                let ptr = self.translate_expr_lvalue(&unary_expr.operand.node, context)?;
+                let dec_operand = context.insert_instruction(ir::Instruction::BinOp {
+                    op: BinaryOperator::Minus,
+                    lhs: operand.clone(),
+                    rhs: ir::Operand::constant(ir::Constant::int(1, ir::Dtype::INT)),
+                    dtype,
+                })?;
+                let _unused = self.translate_assign_operation(&ptr, &dec_operand, context)?;
+                Ok(dec_operand)
+            }
+
+            UnaryOperator::Address => todo!(),
+            UnaryOperator::Indirection => todo!(),
+            UnaryOperator::Complement => todo!(),
+        }
+    }
+
     /// Translate the register value of an expression
     /// e.g.
     /// y = x + 3
@@ -1964,7 +2040,9 @@ impl IrgenFunc<'_> {
                     ir::Dtype::LONG.set_signed(false),
                 )))
             }
-            Expression::UnaryOperator(node) => todo!(),
+            Expression::UnaryOperator(unary_expr) => {
+                self.translate_unary_expression(&unary_expr.node, context)
+            }
             Expression::Cast(expr) => {
                 let target_dtype = ir::Dtype::try_from(&expr.node.type_name.node)
                     .map_err(|e| IrgenErrorMessage::InvalidDtype { dtype_error: e })?;
