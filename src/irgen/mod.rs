@@ -1829,26 +1829,37 @@ impl IrgenFunc<'_> {
         integer: ir::Operand,
         context: &mut Context,
     ) -> Result<ir::Operand, IrgenErrorMessage> {
-        let integer_const = integer
-            .get_constant()
-            .ok_or_else(|| IrgenErrorMessage::Misc {
-                message: "should be integer constant".to_string(),
-            })?;
-
-        match integer_const {
-            ir::Constant::Int {
-                value,
-                width,
-                is_signed,
-            } => {
-                let int_width = ir::Dtype::INT.get_int_width().unwrap();
-                if width < &int_width {
-                    self.translate_typecast(integer, &ir::Dtype::INT, context)
-                } else {
-                    Ok(integer)
+        match &integer {
+            ir::Operand::Constant(constant) => match &constant {
+                ir::Constant::Int {
+                    value,
+                    width,
+                    is_signed,
+                } => {
+                    let int_width = ir::Dtype::INT.get_int_width().unwrap();
+                    if width < &int_width {
+                        self.translate_typecast(integer, &ir::Dtype::INT, context)
+                    } else {
+                        Ok(integer)
+                    }
                 }
-            }
-            _ => panic!("only integer allowed"),
+                _ => panic!("only integer allowed"),
+            },
+            ir::Operand::Register { rid, dtype } => match dtype {
+                ir::Dtype::Int {
+                    width,
+                    is_signed,
+                    is_const,
+                } => {
+                    let int_width = ir::Dtype::INT.get_int_width().unwrap();
+                    if width < &int_width {
+                        self.translate_typecast(integer, &ir::Dtype::INT, context)
+                    } else {
+                        Ok(integer)
+                    }
+                }
+                _ => panic!("only integer allowed"),
+            },
         }
     }
 
