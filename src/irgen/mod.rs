@@ -607,7 +607,7 @@ impl IrgenFunc<'_> {
         let mut operand = None;
 
         for scope in self.symbol_table.iter().rev() {
-            operand = scope.get(var).clone();
+            operand = scope.get(var);
             if let Some(val) = operand {
                 return Ok(val.clone());
             }
@@ -1187,7 +1187,7 @@ impl IrgenFunc<'_> {
         init: &ForInitializer,
         context: &mut Context,
     ) -> Result<(), IrgenErrorMessage> {
-        let _unused = match init {
+        match init {
             ForInitializer::Empty => (),
             ForInitializer::Expression(expr) => {
                 let _unused = self.translate_expr_rvalue(&expr.node, context)?;
@@ -1255,7 +1255,7 @@ impl IrgenFunc<'_> {
                 .deref()
                 .clone();
             let dtype = dtype
-                .resolve_typedefs(&self.typedefs)
+                .resolve_typedefs(self.typedefs)
                 .map_err(|e| IrgenErrorMessage::InvalidDtype { dtype_error: e })?;
             let name = name_of_declarator(declarator);
 
@@ -1308,6 +1308,7 @@ impl IrgenFunc<'_> {
         context: &mut Context,
     ) -> Result<ir::Operand, IrgenErrorMessage> {
         let callee = self.translate_expr_rvalue(&call.callee.node, context)?;
+        // when we call we should get a function pointer
         let function_pointer = callee.dtype();
         let inner = function_pointer.get_pointer_inner().ok_or_else(|| {
             IrgenErrorMessage::NeedFunctionOrFunctionPointer {
@@ -1354,7 +1355,7 @@ impl IrgenFunc<'_> {
         let bid_end = self.alloc_bid();
 
         // to create the new condition translation, we have to commit the previous block entirely
-        let condition = self.translate_condition(
+        self.translate_condition(
             &cond_expr.condition.node,
             mem::replace(context, Context::new(bid_end)),
             bid_then,
@@ -1836,9 +1837,9 @@ impl IrgenFunc<'_> {
             } => {
                 let int_width = ir::Dtype::INT.get_int_width().unwrap();
                 if width < &int_width {
-                    return self.translate_typecast(integer, &ir::Dtype::INT, context);
+                    self.translate_typecast(integer, &ir::Dtype::INT, context)
                 } else {
-                    return Ok(integer);
+                    Ok(integer)
                 }
             }
             _ => panic!("only integer allowed"),
@@ -1878,7 +1879,7 @@ impl IrgenFunc<'_> {
                     // [SELF] not sure how to do this
                     // maybe recursion to see if the inner is array. go until not array
                     // use the pointer at the last. but is it ok?
-                    return self.translate_array_pointer(&ptr, &array_inner, context);
+                    return self.translate_array_pointer(&ptr, array_inner, context);
                 }
 
                 // this function insert instruction into the current context AND assign it to a
@@ -1943,7 +1944,7 @@ impl IrgenFunc<'_> {
                 let target_dtype = ir::Dtype::try_from(&expr.node.type_name.node)
                     .map_err(|e| IrgenErrorMessage::InvalidDtype { dtype_error: e })?;
                 let target_dtype = target_dtype
-                    .resolve_typedefs(&self.typedefs)
+                    .resolve_typedefs(self.typedefs)
                     .map_err(|e| IrgenErrorMessage::InvalidDtype { dtype_error: e })?;
 
                 let operand = self.translate_expr_rvalue(&expr.node.expression.node, context)?;
@@ -2144,7 +2145,7 @@ impl IrgenFunc<'_> {
             ));
 
             // this block also stores value
-            let _unused = self.translate_alloc(var_name, &dtype, value, context)?;
+            let _unused = self.translate_alloc(var_name, dtype, value, context)?;
         }
         Ok(())
     }
@@ -2187,7 +2188,7 @@ impl IrgenFunc<'_> {
 
         // if the allocation also assign some values to the allocation then we need to store it
         if let Some(value) = value {
-            let value = self.translate_typecast(value, &dtype, context)?;
+            let value = self.translate_typecast(value, dtype, context)?;
 
             // store %x xa -> this is allocating value
 
