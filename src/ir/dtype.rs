@@ -919,6 +919,8 @@ impl Dtype {
         }
     }
 
+    /// return (size, align) of dtype
+    /// have to pass all the defined structs in this to resolve struct
     pub fn size_align_of(
         &self,
         structs: &HashMap<String, Option<Dtype>>,
