@@ -1823,7 +1823,10 @@ impl IrgenFunc<'_> {
                     return Ok((new_lhs, rhs_type_convert, rhs_dtype));
                 };
             }
-            (_, _) => panic!("only arithmatic type for arithmatic conversion"),
+            (_, _) => {
+                dbg!(lhs, rhs);
+                panic!("only arithmatic type for arithmatic conversion")
+            }
         }
         Err(IrgenErrorMessage::Misc {
             message: "should have resolved everything by now".to_string(),
