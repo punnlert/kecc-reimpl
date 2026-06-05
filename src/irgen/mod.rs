@@ -1994,8 +1994,22 @@ impl IrgenFunc<'_> {
 
                 Ok(ir::Operand::Constant(constant))
             }
-            Expression::StringLiteral(_string_lit) => todo!(),
-            Expression::Member(node) => todo!(),
+            Expression::StringLiteral(_string_lit) => {
+                panic!("do we need this? Expression::StringLiteral")
+            }
+            Expression::Member(member_expr) => {
+                // MemberExpression
+                let (base_addr, struct_dtype) = match &member_expr.node.operator.node {
+                    MemberOperator::Direct => {
+                        // this should resolve to be
+                        let val =
+                            self.translate_expr_rvalue(&member_expr.node.expression.node, context)?;
+                        (val.clone(), val.dtype())
+                    }
+                    MemberOperator::Indirect => todo!(),
+                };
+                todo!()
+            }
             Expression::Call(call_expr) => self.translate_func_call(&call_expr.node, context),
             Expression::SizeOfTy(type_name) => {
                 let dtype = ir::Dtype::try_from(&type_name.node.0.node)
