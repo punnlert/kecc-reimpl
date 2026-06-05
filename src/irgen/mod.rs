@@ -1559,10 +1559,11 @@ impl IrgenFunc<'_> {
 
         let value = self.translate_typecast(value.clone(), &dtype, context)?;
 
-        context.insert_instruction(ir::Instruction::Store {
+        let _unused = context.insert_instruction(ir::Instruction::Store {
             ptr: ptr.clone(),
-            value,
-        })
+            value: value.clone(),
+        });
+        Ok(value)
     }
 
     fn translate_binary_operator_expression(
