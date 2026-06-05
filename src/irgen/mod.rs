@@ -704,7 +704,12 @@ impl IrgenFunc<'_> {
 
                 let mut context_else = Context::new(bid_else);
                 if let Some(else_block) = &stmt.node.else_statement {
-                    self.translate_stmt(&else_block.node, context, bid_continue, bid_break)?;
+                    self.translate_stmt(
+                        &else_block.node,
+                        &mut context_else,
+                        bid_continue,
+                        bid_break,
+                    )?;
                 }
 
                 self.insert_block(
