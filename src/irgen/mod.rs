@@ -2240,6 +2240,9 @@ impl IrgenFunc<'_> {
     ) -> Result<(), IrgenErrorMessage> {
         // aid is allocation id
         for (aid, (dtype, var_name)) in izip!(&signature.params, name_of_params).enumerate() {
+            // [SELF] added myself
+            self.phinodes_init
+                .push(Named::new(Some(var_name.to_string()), dtype.clone()));
             // [SELF] check later
             // this is the register that should be allocate
             let value = Some(ir::Operand::register(
