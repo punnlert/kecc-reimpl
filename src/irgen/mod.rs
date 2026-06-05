@@ -1577,12 +1577,11 @@ impl IrgenFunc<'_> {
             return self.translate_assign_operation(&ptr, &value, context);
         }
 
-        let lhs_rvalue = self.translate_expr_rvalue(&binop_expr.lhs.node, context)?;
-        let rhs_rvalue = self.translate_expr_rvalue(&binop_expr.rhs.node, context)?;
-
         //[SELF] this is array indexing might need to fix this later
         match &binop_expr.operator.node {
             BinaryOperator::Index => {
+                let lhs_rvalue = self.translate_expr_rvalue(&binop_expr.lhs.node, context)?;
+                let rhs_rvalue = self.translate_expr_rvalue(&binop_expr.rhs.node, context)?;
                 let inner_dtype = lhs_rvalue
                     .dtype()
                     .get_array_inner()
@@ -1616,6 +1615,8 @@ impl IrgenFunc<'_> {
             | BinaryOperator::Modulo
             | BinaryOperator::Plus
             | BinaryOperator::Minus => {
+                let lhs_rvalue = self.translate_expr_rvalue(&binop_expr.lhs.node, context)?;
+                let rhs_rvalue = self.translate_expr_rvalue(&binop_expr.rhs.node, context)?;
                 let (lhs_converted, rhs_converted, dtype) =
                     self.arithmatic_conversion(lhs_rvalue, rhs_rvalue, context)?;
 
@@ -1631,6 +1632,8 @@ impl IrgenFunc<'_> {
             | BinaryOperator::BitwiseAnd
             | BinaryOperator::BitwiseXor
             | BinaryOperator::BitwiseOr => {
+                let lhs_rvalue = self.translate_expr_rvalue(&binop_expr.lhs.node, context)?;
+                let rhs_rvalue = self.translate_expr_rvalue(&binop_expr.rhs.node, context)?;
                 let lhs_promote = self.integer_promotions(lhs_rvalue, context)?;
                 let rhs_promote = self.integer_promotions(rhs_rvalue, context)?;
 
@@ -1649,6 +1652,8 @@ impl IrgenFunc<'_> {
             | BinaryOperator::GreaterOrEqual
             | BinaryOperator::Equals
             | BinaryOperator::NotEquals => {
+                let lhs_rvalue = self.translate_expr_rvalue(&binop_expr.lhs.node, context)?;
+                let rhs_rvalue = self.translate_expr_rvalue(&binop_expr.rhs.node, context)?;
                 let (lhs_converted, rhs_converted, dtype) =
                     self.arithmatic_conversion(lhs_rvalue, rhs_rvalue, context)?;
 
@@ -1661,16 +1666,109 @@ impl IrgenFunc<'_> {
 
                 // self.translate_typecast(reg, &ir::Dtype::BOOL, context)
             }
-            BinaryOperator::LogicalAnd | BinaryOperator::LogicalOr => {
-                let lhs_bool = self.translate_typecast_to_bool(lhs_rvalue, context)?;
-                let rhs_bool = self.translate_typecast_to_bool(rhs_rvalue, context)?;
+            BinaryOperator::LogicalAnd => {
+                let bid_lhs_true = self.alloc_bid();
+                let bid_lhs_false = self.alloc_bid();
+                let bid_end = self.alloc_bid();
 
-                context.insert_instruction(ir::Instruction::BinOp {
-                    op: binop_expr.operator.node.clone(),
-                    lhs: lhs_bool,
-                    rhs: rhs_bool,
-                    dtype: ir::Dtype::BOOL,
-                })
+                let mut context_lhs_true = Context::new(bid_lhs_true);
+                let lhs_rvalue = self.translate_expr_rvalue(&binop_expr.lhs.node, context)?;
+
+                // conclude the current block
+                // if lhs is true then jump to rhs
+                self.insert_block(
+                    mem::replace(context, Context::new(bid_end)),
+                    ir::BlockExit::ConditionalJump {
+                        condition: lhs_rvalue,
+                        arg_then: ir::JumpArg::new(bid_lhs_true, Vec::new()),
+                        arg_else: ir::JumpArg::new(bid_lhs_false, Vec::new()),
+                    },
+                );
+
+                let temp_var = self.alloc_tempid();
+                let ptr = self.alloc_ptr(&temp_var, &ir::Dtype::BOOL)?;
+
+                let rhs_rvalue =
+                    self.translate_expr_rvalue(&binop_expr.rhs.node, &mut context_lhs_true)?;
+                // store rhs value in the result ptr (because if it comes to this point then lhs is
+                // true, then the value of the stmt depends on the rhs alone)
+                let _unused =
+                    self.translate_assign_operation(&ptr, &rhs_rvalue, &mut context_lhs_true)?;
+
+                self.insert_block(
+                    context_lhs_true,
+                    ir::BlockExit::Jump {
+                        arg: ir::JumpArg::new(bid_end, Vec::new()),
+                    },
+                );
+
+                let mut context_lhs_false = Context::new(bid_lhs_false);
+                let _unused = self.translate_assign_operation(
+                    &ptr,
+                    &ir::Operand::constant(ir::Constant::int(0, ir::Dtype::BOOL)),
+                    &mut context_lhs_false,
+                )?;
+                self.insert_block(
+                    context_lhs_false,
+                    ir::BlockExit::Jump {
+                        arg: ir::JumpArg::new(bid_end, Vec::new()),
+                    },
+                );
+
+                // load the ptr at the end
+                context.insert_instruction(ir::Instruction::Load { ptr })
+            }
+            BinaryOperator::LogicalOr => {
+                let bid_lhs_true = self.alloc_bid();
+                let bid_lhs_false = self.alloc_bid();
+                let bid_end = self.alloc_bid();
+
+                let mut context_lhs_true = Context::new(bid_lhs_true);
+                let mut context_lhs_false = Context::new(bid_lhs_false);
+                let lhs_rvalue = self.translate_expr_rvalue(&binop_expr.lhs.node, context)?;
+
+                // conclude the current block
+                // if lhs is true then jump to rhs
+                self.insert_block(
+                    mem::replace(context, Context::new(bid_end)),
+                    ir::BlockExit::ConditionalJump {
+                        condition: lhs_rvalue,
+                        arg_then: ir::JumpArg::new(bid_lhs_true, Vec::new()),
+                        arg_else: ir::JumpArg::new(bid_lhs_false, Vec::new()),
+                    },
+                );
+
+                let temp_var = self.alloc_tempid();
+                let ptr = self.alloc_ptr(&temp_var, &ir::Dtype::BOOL)?;
+
+                let rhs_rvalue =
+                    self.translate_expr_rvalue(&binop_expr.rhs.node, &mut context_lhs_false)?;
+
+                let _unused =
+                    self.translate_assign_operation(&ptr, &rhs_rvalue, &mut context_lhs_false)?;
+
+                self.insert_block(
+                    context_lhs_false,
+                    ir::BlockExit::Jump {
+                        arg: ir::JumpArg::new(bid_end, Vec::new()),
+                    },
+                );
+
+                // if lhs true then its automatically 1
+                let _unused = self.translate_assign_operation(
+                    &ptr,
+                    &ir::Operand::constant(ir::Constant::int(1, ir::Dtype::BOOL)),
+                    &mut context_lhs_true,
+                )?;
+                self.insert_block(
+                    context_lhs_true,
+                    ir::BlockExit::Jump {
+                        arg: ir::JumpArg::new(bid_end, Vec::new()),
+                    },
+                );
+
+                // load the ptr at the end
+                context.insert_instruction(ir::Instruction::Load { ptr })
             }
             BinaryOperator::Assign => {
                 panic!("Assign should be resolved by now")
@@ -1680,6 +1778,8 @@ impl IrgenFunc<'_> {
             | BinaryOperator::AssignModulo
             | BinaryOperator::AssignPlus
             | BinaryOperator::AssignMinus => {
+                let lhs_rvalue = self.translate_expr_rvalue(&binop_expr.lhs.node, context)?;
+                let rhs_rvalue = self.translate_expr_rvalue(&binop_expr.rhs.node, context)?;
                 let op = match &binop_expr.operator.node {
                     BinaryOperator::AssignMultiply => BinaryOperator::Multiply,
                     BinaryOperator::AssignDivide => BinaryOperator::Divide,
@@ -1708,6 +1808,8 @@ impl IrgenFunc<'_> {
             | BinaryOperator::AssignBitwiseAnd
             | BinaryOperator::AssignBitwiseXor
             | BinaryOperator::AssignBitwiseOr => {
+                let lhs_rvalue = self.translate_expr_rvalue(&binop_expr.lhs.node, context)?;
+                let rhs_rvalue = self.translate_expr_rvalue(&binop_expr.rhs.node, context)?;
                 let op = match &binop_expr.operator.node {
                     BinaryOperator::AssignShiftLeft => BinaryOperator::ShiftLeft,
                     BinaryOperator::AssignShiftRight => BinaryOperator::ShiftRight,
