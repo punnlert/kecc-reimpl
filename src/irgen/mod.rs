@@ -1261,6 +1261,7 @@ impl IrgenFunc<'_> {
 
             match dtype {
                 ir::Dtype::Unit { is_const } => {
+                    // [SELF] this might be wrong
                     return Err(IrgenErrorMessage::InvalidDtype {
                         dtype_error: DtypeError::Misc {
                             message: "can't declare thing with type `void`".to_string(),
