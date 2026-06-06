@@ -1639,11 +1639,7 @@ impl IrgenFunc<'_> {
                     dtype,
                 })
             }
-            BinaryOperator::ShiftLeft
-            | BinaryOperator::ShiftRight
-            | BinaryOperator::BitwiseAnd
-            | BinaryOperator::BitwiseXor
-            | BinaryOperator::BitwiseOr => {
+            BinaryOperator::ShiftLeft | BinaryOperator::ShiftRight => {
                 let lhs_rvalue = self.translate_expr_rvalue(&binop_expr.lhs.node, context)?;
                 let rhs_rvalue = self.translate_expr_rvalue(&binop_expr.rhs.node, context)?;
                 let lhs_promote = self.integer_promotions(lhs_rvalue, context)?;
@@ -1655,6 +1651,21 @@ impl IrgenFunc<'_> {
                     op: binop_expr.operator.node.clone(),
                     lhs: lhs_promote,
                     rhs: rhs_promote,
+                    dtype,
+                })
+            }
+
+            BinaryOperator::BitwiseAnd | BinaryOperator::BitwiseXor | BinaryOperator::BitwiseOr => {
+                let lhs_rvalue = self.translate_expr_rvalue(&binop_expr.lhs.node, context)?;
+                let rhs_rvalue = self.translate_expr_rvalue(&binop_expr.rhs.node, context)?;
+
+                let (lhs_converted, rhs_converted, dtype) =
+                    self.arithmatic_conversion(lhs_rvalue, rhs_rvalue, context)?;
+
+                context.insert_instruction(ir::Instruction::BinOp {
+                    op: binop_expr.operator.node.clone(),
+                    lhs: lhs_converted,
+                    rhs: rhs_converted,
                     dtype,
                 })
             }
