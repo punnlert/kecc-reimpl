@@ -1232,7 +1232,19 @@ impl IrgenFunc<'_> {
         value: ir::Operand,
         context: &mut Context,
     ) -> Result<ir::Operand, IrgenErrorMessage> {
-        self.translate_typecast(value, &ir::Dtype::BOOL, context)
+        // if it is not 0 then this will return true
+        let dtype = value.dtype();
+
+        if (dtype == ir::Dtype::BOOL) {
+            Ok(value)
+        } else {
+            context.insert_instruction(ir::Instruction::BinOp {
+                op: BinaryOperator::NotEquals,
+                lhs: value,
+                rhs: ir::Operand::constant(ir::Constant::int(0, ir::Dtype::INT)),
+                dtype: ir::Dtype::BOOL,
+            })
+        }
     }
 
     fn translate_decl(
