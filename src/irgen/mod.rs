@@ -1918,49 +1918,61 @@ impl IrgenFunc<'_> {
                 }
             }
             (ir::Dtype::Int { .. }, ir::Dtype::Int { .. }) => {
-                let lhs_type_convert = self.integer_promotions(lhs, context)?;
-                let rhs_type_convert = self.integer_promotions(rhs, context)?;
+                let lhs = self.integer_promotions(lhs, context)?;
+                let rhs = self.integer_promotions(rhs, context)?;
 
-                let lhs_dtype = lhs_type_convert.dtype();
-                let rhs_dtype = rhs_type_convert.dtype();
+                let lhs_dtype = lhs.dtype();
+                let rhs_dtype = rhs.dtype();
+
+                let lhs_width = lhs_dtype.get_int_width();
+                let rhs_width = rhs_dtype.get_int_width();
+
+                let lhs_signed = lhs_dtype.is_int_signed();
+                let rhs_signed = rhs_dtype.is_int_signed();
 
                 if (lhs_dtype == rhs_dtype) {
-                    return Ok((lhs_type_convert, rhs_type_convert, lhs_dtype));
+                    return Ok((lhs, rhs, lhs_dtype));
                 }
 
                 // get the biggest width
-                let convert_width = lhs_dtype
-                    .get_int_width()
-                    .max(rhs_dtype.get_int_width())
-                    .unwrap();
+                let convert_width = lhs_width.max(rhs_width).unwrap();
 
                 // if both has the same signed
-                if (lhs_dtype.is_int_signed() == rhs_dtype.is_int_signed()) {
-                    let is_signed = lhs_dtype.is_int_signed();
+                if (lhs_signed == rhs_signed) {
+                    let is_signed = lhs_signed;
                     let dtype = ir::Dtype::Int {
                         width: convert_width,
                         is_signed,
                         is_const: false,
                     };
 
-                    let new_lhs = self.translate_typecast(lhs_type_convert, &dtype, context)?;
-                    let new_rhs = self.translate_typecast(rhs_type_convert, &dtype, context)?;
+                    let new_lhs = self.translate_typecast(lhs, &dtype, context)?;
+                    let new_rhs = self.translate_typecast(rhs, &dtype, context)?;
 
                     return Ok((new_lhs, new_rhs, dtype));
                 }
 
-                // lhs width is wider
-                if (lhs_dtype.get_int_width().unwrap() == convert_width) {
-                    let new_rhs = self.translate_typecast(rhs_type_convert, &lhs_dtype, context)?;
-
-                    return Ok((lhs_type_convert, new_rhs, lhs_dtype));
+                match (lhs_signed, rhs_signed) {
+                    (true, false) => {
+                        if (lhs_width <= rhs_width) {
+                            let new_lhs = self.translate_typecast(lhs, &rhs_dtype, context)?;
+                            return Ok((new_lhs, rhs, rhs_dtype));
+                        } else {
+                            let new_rhs = self.translate_typecast(rhs, &lhs_dtype, context)?;
+                            return Ok((lhs, new_rhs, lhs_dtype));
+                        }
+                    }
+                    (false, true) => {
+                        if (lhs_width >= rhs_width) {
+                            let new_rhs = self.translate_typecast(rhs, &lhs_dtype, context)?;
+                            return Ok((lhs, new_rhs, lhs_dtype));
+                        } else {
+                            let new_lhs = self.translate_typecast(lhs, &rhs_dtype, context)?;
+                            return Ok((new_lhs, rhs, rhs_dtype));
+                        }
+                    }
+                    (_, _) => panic!("not possible"),
                 }
-
-                if (rhs_dtype.get_int_width().unwrap() == convert_width) {
-                    let new_lhs = self.translate_typecast(lhs_type_convert, &rhs_dtype, context)?;
-
-                    return Ok((new_lhs, rhs_type_convert, rhs_dtype));
-                };
             }
             (_, _) => {
                 dbg!(lhs, rhs);
