@@ -2512,7 +2512,11 @@ impl IrgenFunc<'_> {
     ) -> Result<ir::Operand, IrgenErrorMessage> {
         let v_dtype = value.dtype();
 
-        if &v_dtype == dtype {
+        // [SELF]
+        // can't typecast into const? maybe
+        let dtype = dtype.clone().set_const(false);
+
+        if v_dtype == dtype {
             Ok(value)
         } else {
             context.insert_instruction(ir::Instruction::TypeCast {
