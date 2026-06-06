@@ -1697,12 +1697,16 @@ impl IrgenFunc<'_> {
                 let mut context_lhs_true = Context::new(bid_lhs_true);
                 let lhs_rvalue = self.translate_expr_rvalue(&binop_expr.lhs.node, context)?;
 
+                // lhs_rvalue is false when it is 0 and true otherwise
+                // if it is not 0 then this will return true
+                let condition = self.translate_typecast_to_bool(lhs_rvalue, context)?;
+
                 // conclude the current block
                 // if lhs is true then jump to rhs
                 self.insert_block(
                     mem::replace(context, Context::new(bid_end)),
                     ir::BlockExit::ConditionalJump {
-                        condition: lhs_rvalue,
+                        condition,
                         arg_then: ir::JumpArg::new(bid_lhs_true, Vec::new()),
                         arg_else: ir::JumpArg::new(bid_lhs_false, Vec::new()),
                     },
@@ -1713,6 +1717,9 @@ impl IrgenFunc<'_> {
 
                 let rhs_rvalue =
                     self.translate_expr_rvalue(&binop_expr.rhs.node, &mut context_lhs_true)?;
+
+                let rhs_rvalue =
+                    self.translate_typecast_to_bool(rhs_rvalue, &mut context_lhs_true)?;
                 // store rhs value in the result ptr (because if it comes to this point then lhs is
                 // true, then the value of the stmt depends on the rhs alone)
                 let _unused =
@@ -1750,12 +1757,16 @@ impl IrgenFunc<'_> {
                 let mut context_lhs_false = Context::new(bid_lhs_false);
                 let lhs_rvalue = self.translate_expr_rvalue(&binop_expr.lhs.node, context)?;
 
+                // lhs_rvalue is false when it is 0 and true otherwise
+                // if it is not 0 then this will return true
+                let condition = self.translate_typecast_to_bool(lhs_rvalue, context)?;
+
                 // conclude the current block
                 // if lhs is true then jump to rhs
                 self.insert_block(
                     mem::replace(context, Context::new(bid_end)),
                     ir::BlockExit::ConditionalJump {
-                        condition: lhs_rvalue,
+                        condition,
                         arg_then: ir::JumpArg::new(bid_lhs_true, Vec::new()),
                         arg_else: ir::JumpArg::new(bid_lhs_false, Vec::new()),
                     },
@@ -1766,6 +1777,9 @@ impl IrgenFunc<'_> {
 
                 let rhs_rvalue =
                     self.translate_expr_rvalue(&binop_expr.rhs.node, &mut context_lhs_false)?;
+
+                let rhs_rvalue =
+                    self.translate_typecast_to_bool(rhs_rvalue, &mut context_lhs_false)?;
 
                 let _unused =
                     self.translate_assign_operation(&ptr, &rhs_rvalue, &mut context_lhs_false)?;
