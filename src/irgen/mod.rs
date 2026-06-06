@@ -2023,26 +2023,31 @@ impl IrgenFunc<'_> {
         }
     }
 
-    fn translate_unary_expression(
+    fn translate_arithmatic_unary_expression(
         &mut self,
-        unary_expr: &UnaryOperatorExpression,
+        operator: &UnaryOperator,
+        expr: &Expression,
         context: &mut Context,
     ) -> Result<ir::Operand, IrgenErrorMessage> {
-        let op = unary_expr.operator.node.clone();
-        let operand = self.translate_expr_rvalue(&unary_expr.operand.node, context)?;
-        let dtype = operand.dtype();
-        match &unary_expr.operator.node {
+        let operand = self.translate_expr_rvalue(expr, context)?;
+        let op = operator.clone();
+        match operator {
             UnaryOperator::Plus | UnaryOperator::Minus => {
+                let dtype = operand.dtype();
                 let operand = self.integer_promotions(operand, context)?;
                 context.insert_instruction(ir::Instruction::UnaryOp { op, operand, dtype })
             }
 
             UnaryOperator::Negate => {
+                let dtype = operand.dtype();
                 context.insert_instruction(ir::Instruction::UnaryOp { op, operand, dtype })
             }
 
+            UnaryOperator::Complement => todo!(),
+
             UnaryOperator::PostIncrement => {
-                let ptr = self.translate_expr_lvalue(&unary_expr.operand.node, context)?;
+                let dtype = operand.dtype();
+                let ptr = self.translate_expr_lvalue(expr, context)?;
                 let inc_operand = context.insert_instruction(ir::Instruction::BinOp {
                     op: BinaryOperator::Plus,
                     lhs: operand.clone(),
@@ -2058,7 +2063,8 @@ impl IrgenFunc<'_> {
             }
 
             UnaryOperator::PostDecrement => {
-                let ptr = self.translate_expr_lvalue(&unary_expr.operand.node, context)?;
+                let dtype = operand.dtype();
+                let ptr = self.translate_expr_lvalue(expr, context)?;
                 let dec_operand = context.insert_instruction(ir::Instruction::BinOp {
                     op: BinaryOperator::Minus,
                     lhs: operand.clone(),
@@ -2070,7 +2076,8 @@ impl IrgenFunc<'_> {
             }
 
             UnaryOperator::PreIncrement => {
-                let ptr = self.translate_expr_lvalue(&unary_expr.operand.node, context)?;
+                let dtype = operand.dtype();
+                let ptr = self.translate_expr_lvalue(expr, context)?;
                 let inc_operand = context.insert_instruction(ir::Instruction::BinOp {
                     op: BinaryOperator::Plus,
                     lhs: operand.clone(),
@@ -2082,7 +2089,8 @@ impl IrgenFunc<'_> {
             }
 
             UnaryOperator::PreDecrement => {
-                let ptr = self.translate_expr_lvalue(&unary_expr.operand.node, context)?;
+                let dtype = operand.dtype();
+                let ptr = self.translate_expr_lvalue(expr, context)?;
                 let dec_operand = context.insert_instruction(ir::Instruction::BinOp {
                     op: BinaryOperator::Minus,
                     lhs: operand.clone(),
@@ -2092,10 +2100,34 @@ impl IrgenFunc<'_> {
                 let _unused = self.translate_assign_operation(&ptr, &dec_operand, context)?;
                 Ok(dec_operand)
             }
+            _ => panic!("not a arithmatic operator"),
+        }
+    }
 
-            UnaryOperator::Address => todo!(),
-            UnaryOperator::Indirection => todo!(),
-            UnaryOperator::Complement => todo!(),
+    fn translate_unary_expression(
+        &mut self,
+        unary_expr: &UnaryOperatorExpression,
+        context: &mut Context,
+    ) -> Result<ir::Operand, IrgenErrorMessage> {
+        match &unary_expr.operator.node {
+            UnaryOperator::Plus
+            | UnaryOperator::Minus
+            | UnaryOperator::Negate
+            | UnaryOperator::Complement
+            | UnaryOperator::PostIncrement
+            | UnaryOperator::PostDecrement
+            | UnaryOperator::PreIncrement
+            | UnaryOperator::PreDecrement => self.translate_arithmatic_unary_expression(
+                &unary_expr.operator.node,
+                &unary_expr.operand.node,
+                context,
+            ),
+
+            UnaryOperator::Address => self.translate_expr_lvalue(&unary_expr.operand.node, context),
+            UnaryOperator::Indirection => {
+                let ptr = self.translate_expr_rvalue(&unary_expr.operand.node, context)?;
+                context.insert_instruction(ir::Instruction::Load { ptr })
+            }
         }
     }
 
