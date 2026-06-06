@@ -2283,7 +2283,7 @@ impl IrgenFunc<'_> {
                     // *x = 64
                     // then we have to get the location of x
                     UnaryOperator::Indirection => {
-                        Ok(self.translate_expr_rvalue(&expr.node.operand.node, context)?)
+                        self.translate_expr_rvalue(&expr.node.operand.node, context)
                     }
                     _ => panic!("unary op other than indirection is not supported"),
                 }
