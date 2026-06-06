@@ -2051,7 +2051,7 @@ impl IrgenFunc<'_> {
                 let inc_operand = context.insert_instruction(ir::Instruction::BinOp {
                     op: BinaryOperator::Plus,
                     lhs: operand.clone(),
-                    rhs: ir::Operand::constant(ir::Constant::int(1, ir::Dtype::INT)),
+                    rhs: ir::Operand::constant(ir::Constant::int(1, dtype.clone())),
                     dtype,
                 })?;
 
@@ -2068,7 +2068,7 @@ impl IrgenFunc<'_> {
                 let dec_operand = context.insert_instruction(ir::Instruction::BinOp {
                     op: BinaryOperator::Minus,
                     lhs: operand.clone(),
-                    rhs: ir::Operand::constant(ir::Constant::int(1, ir::Dtype::INT)),
+                    rhs: ir::Operand::constant(ir::Constant::int(1, dtype.clone())),
                     dtype,
                 })?;
                 let _unused = self.translate_assign_operation(&ptr, &dec_operand, context)?;
@@ -2081,7 +2081,7 @@ impl IrgenFunc<'_> {
                 let inc_operand = context.insert_instruction(ir::Instruction::BinOp {
                     op: BinaryOperator::Plus,
                     lhs: operand.clone(),
-                    rhs: ir::Operand::constant(ir::Constant::int(1, ir::Dtype::INT)),
+                    rhs: ir::Operand::constant(ir::Constant::int(1, dtype.clone())),
                     dtype,
                 })?;
                 let _unused = self.translate_assign_operation(&ptr, &inc_operand, context)?;
@@ -2094,7 +2094,7 @@ impl IrgenFunc<'_> {
                 let dec_operand = context.insert_instruction(ir::Instruction::BinOp {
                     op: BinaryOperator::Minus,
                     lhs: operand.clone(),
-                    rhs: ir::Operand::constant(ir::Constant::int(1, ir::Dtype::INT)),
+                    rhs: ir::Operand::constant(ir::Constant::int(1, dtype.clone())),
                     dtype,
                 })?;
                 let _unused = self.translate_assign_operation(&ptr, &dec_operand, context)?;
