@@ -2211,14 +2211,10 @@ impl IrgenFunc<'_> {
             }
             Expression::SizeOfVal(expr) => {
                 // [SELF] translating the expr first then look at its dtype
-                let rval = self.translate_expr_rvalue(&expr.node.0.node, context)?;
-                let dtype = rval.dtype();
-                let (size_of, _) = dtype
-                    .size_align_of(self.structs)
-                    .map_err(|e| IrgenErrorMessage::InvalidDtype { dtype_error: e })?;
+                let size_of = self.calculate_sizeof_expr(&expr.node.0.node)?;
 
                 Ok(ir::Operand::Constant(ir::Constant::int(
-                    size_of as u128,
+                    size_of,
                     ir::Dtype::LONG.set_signed(false),
                 )))
             }
@@ -2256,6 +2252,140 @@ impl IrgenFunc<'_> {
             }
             Expression::Conditional(cond) => self.translate_conditional(&cond.node, context),
             _ => panic!("unsupported"),
+        }
+    }
+
+    fn calculate_sizeof_expr(&mut self, expr: &Expression) -> Result<u128, IrgenErrorMessage> {
+        let (size_of_int, _) = ir::Dtype::INT
+            .size_align_of(self.structs)
+            .map_err(|e| IrgenErrorMessage::InvalidDtype { dtype_error: e })?;
+        match expr {
+            Expression::Identifier(id) => {
+                let dtype = self.lookup_symbol_table_entry(&id.node.name)?.dtype();
+                let dtype = dtype.get_pointer_inner().unwrap();
+                let (size_of, _) = dtype
+                    .size_align_of(self.structs)
+                    .map_err(|e| IrgenErrorMessage::InvalidDtype { dtype_error: e })?;
+                Ok(size_of as u128)
+            }
+            Expression::Constant(con) => {
+                let dtype = ir::Constant::try_from(&con.node)
+                    .expect("constant should convert to ir constant fine")
+                    .dtype();
+                let (size_of, _) = dtype
+                    .size_align_of(self.structs)
+                    .map_err(|e| IrgenErrorMessage::InvalidDtype { dtype_error: e })?;
+                Ok(size_of as u128)
+            }
+            Expression::Member(member_expr) => todo!(),
+            Expression::Call(call_expr) => {
+                let callee = call_expr.node.callee.node.clone();
+
+                todo!()
+            }
+            Expression::SizeOfTy(_) => Ok(size_of_int as u128),
+            Expression::SizeOfVal(_) => Ok(size_of_int as u128),
+            Expression::AlignOf(_) => Ok(size_of_int as u128),
+            Expression::UnaryOperator(unary_expr) => {
+                self.calculate_sizeof_unary_expr(&unary_expr.node)
+            }
+            Expression::Cast(cast_expr) => {
+                // let dtype = cast_expr.node.type_name.node;
+                let type_name = cast_expr.node.type_name.node.clone();
+                let dtype = ir::Dtype::try_from(&type_name)
+                    .map_err(|e| IrgenErrorMessage::InvalidDtype { dtype_error: e })?;
+                let (size_of, _) = dtype
+                    .size_align_of(self.structs)
+                    .map_err(|e| IrgenErrorMessage::InvalidDtype { dtype_error: e })?;
+                Ok(size_of as u128)
+            }
+            Expression::BinaryOperator(node) => todo!(),
+            Expression::Conditional(node) => todo!(),
+            Expression::Comma(nodes) => todo!(),
+            _ => panic!("not supported"),
+        }
+    }
+
+    fn calculate_sizeof_unary_expr(
+        &mut self,
+        unary_expr: &UnaryOperatorExpression,
+    ) -> Result<u128, IrgenErrorMessage> {
+        let operand = &unary_expr.operand.node;
+        match &unary_expr.operator.node {
+            // result type is the type of the operand
+            UnaryOperator::PostIncrement
+            | UnaryOperator::PostDecrement
+            | UnaryOperator::PreIncrement
+            | UnaryOperator::PreDecrement => self.calculate_sizeof_expr(operand),
+            // `&x` yields a pointer
+            UnaryOperator::Address => Ok(ir::Dtype::SIZE_OF_POINTER as u128),
+            // `*p` yields the pointee; its size is the size of the type `p` points to
+            UnaryOperator::Indirection => {
+                let dtype = self.dtype_of_expr(operand)?;
+                let inner = dtype.get_pointer_inner().ok_or(IrgenErrorMessage::Misc {
+                    message: "cannot dereference a non-pointer type".to_string(),
+                })?;
+                let (size_of, _) = inner
+                    .size_align_of(self.structs)
+                    .map_err(|e| IrgenErrorMessage::InvalidDtype { dtype_error: e })?;
+                Ok(size_of as u128)
+            }
+            // `+x`, `-x`, `~x`: result type is the integer-promoted operand type, so
+            // anything narrower than `int` becomes `int`
+            UnaryOperator::Plus | UnaryOperator::Minus | UnaryOperator::Complement => {
+                let size = self.calculate_sizeof_expr(operand)?;
+                let (int_size, _) = ir::Dtype::INT
+                    .size_align_of(self.structs)
+                    .map_err(|e| IrgenErrorMessage::InvalidDtype { dtype_error: e })?;
+                Ok(size.max(int_size as u128))
+            }
+            // `!x` always yields `int`
+            UnaryOperator::Negate => {
+                let (size_of, _) = ir::Dtype::INT
+                    .size_align_of(self.structs)
+                    .map_err(|e| IrgenErrorMessage::InvalidDtype { dtype_error: e })?;
+                Ok(size_of as u128)
+            }
+        }
+    }
+
+    /// Statically resolve the `Dtype` of an expression, for the cases needed when
+    /// computing `sizeof` without emitting any instructions.
+    fn dtype_of_expr(&mut self, expr: &Expression) -> Result<ir::Dtype, IrgenErrorMessage> {
+        match expr {
+            Expression::Identifier(id) => Ok(self
+                .lookup_symbol_table_entry(&id.node.name)?
+                .dtype()
+                .get_pointer_inner()
+                .unwrap()
+                .clone()),
+            Expression::Constant(con) => Ok(ir::Constant::try_from(&con.node)
+                .expect("constant should convert to ir constant fine")
+                .dtype()),
+            Expression::Cast(cast_expr) => {
+                let type_name = cast_expr.node.type_name.node.clone();
+                ir::Dtype::try_from(&type_name)
+                    .map_err(|e| IrgenErrorMessage::InvalidDtype { dtype_error: e })
+            }
+            Expression::UnaryOperator(unary_expr) => match &unary_expr.node.operator.node {
+                // `&x` yields a pointer to the operand's type
+                UnaryOperator::Address => {
+                    let inner = self.dtype_of_expr(&unary_expr.node.operand.node)?;
+                    Ok(ir::Dtype::pointer(inner))
+                }
+                // `*p` yields the pointee type
+                UnaryOperator::Indirection => {
+                    let dtype = self.dtype_of_expr(&unary_expr.node.operand.node)?;
+                    dtype
+                        .get_pointer_inner()
+                        .cloned()
+                        .ok_or(IrgenErrorMessage::Misc {
+                            message: "cannot dereference a non-pointer type".to_string(),
+                        })
+                }
+                _ => self.dtype_of_expr(&unary_expr.node.operand.node),
+            },
+            _ => todo!(),
         }
     }
 
