@@ -1305,7 +1305,6 @@ impl IrgenFunc<'_> {
                 }
                 ir::Dtype::Array { .. } => {
                     let arr_ptr = self.translate_alloc(&name, &dtype, None, context)?;
-                    dbg!(&arr_ptr);
 
                     if let Some(value) = &init_decl.node.initializer {
                         self.translate_array_initializer(&value.node, &dtype, &arr_ptr, context)?;
