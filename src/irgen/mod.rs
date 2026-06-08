@@ -2061,7 +2061,19 @@ impl IrgenFunc<'_> {
                 context.insert_instruction(ir::Instruction::UnaryOp { op, operand, dtype })
             }
 
-            UnaryOperator::Complement => todo!(),
+            UnaryOperator::Complement => {
+                let operand = self.integer_promotions(operand, context)?;
+                let dtype = operand.dtype();
+                let width = dtype.get_int_width().expect("to exist");
+                let rhs = u128::MAX;
+
+                context.insert_instruction(ir::Instruction::BinOp {
+                    op: BinaryOperator::BitwiseXor,
+                    lhs: operand,
+                    rhs: ir::Operand::constant(ir::Constant::int(rhs, ir::Dtype::INT)),
+                    dtype,
+                })
+            }
 
             UnaryOperator::PostIncrement => {
                 let dtype = operand.dtype();
