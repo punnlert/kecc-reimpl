@@ -2251,6 +2251,13 @@ impl IrgenFunc<'_> {
                 self.translate_binary_operator_expression(&binop_expr.node, context)
             }
             Expression::Conditional(cond) => self.translate_conditional(&cond.node, context),
+            Expression::Comma(exprs) => {
+                let mut result: Option<ir::Operand> = None;
+                for expr in exprs.iter() {
+                    result = Some(self.translate_expr_rvalue(&expr.node, context)?);
+                }
+                Ok(result.expect("this should have some value"))
+            }
             _ => panic!("unsupported"),
         }
     }
