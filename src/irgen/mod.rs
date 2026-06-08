@@ -2003,7 +2003,7 @@ impl IrgenFunc<'_> {
                         Ok(integer)
                     }
                 }
-                _ => panic!("only integer allowed"),
+                _ => Ok(integer),
             },
             ir::Operand::Register { rid, dtype } => match dtype {
                 ir::Dtype::Int {
@@ -2018,7 +2018,7 @@ impl IrgenFunc<'_> {
                         Ok(integer)
                     }
                 }
-                _ => panic!("only integer allowed"),
+                _ => Ok(integer),
             },
         }
     }
