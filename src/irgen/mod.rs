@@ -1303,10 +1303,17 @@ impl IrgenFunc<'_> {
                         },
                     });
                 }
+                ir::Dtype::Array { .. } => {
+                    let arr_ptr = self.translate_alloc(&name, &dtype, None, context)?;
+                    dbg!(&arr_ptr);
+
+                    if let Some(value) = &init_decl.node.initializer {
+                        self.translate_array_initializer(&value.node, &dtype, &arr_ptr, context)?;
+                    }
+                }
                 ir::Dtype::Int { .. }
                 | ir::Dtype::Float { .. }
                 | ir::Dtype::Pointer { .. }
-                | ir::Dtype::Array { .. }
                 | ir::Dtype::Struct { .. } => {
                     let init_value = if let Some(value) = &init_decl.node.initializer {
                         Some(self.translate_initializer(&value.node, context)?)
@@ -1329,6 +1336,49 @@ impl IrgenFunc<'_> {
             }
         }
 
+        Ok(())
+    }
+
+    fn translate_array_initializer(
+        &mut self,
+        initializer: &Initializer,
+        dtype: &ir::Dtype,
+        arr_ptr: &ir::Operand,
+        context: &mut Context,
+    ) -> Result<(), IrgenErrorMessage> {
+        let dtype = dtype
+            .get_array_inner()
+            .ok_or_else(|| IrgenErrorMessage::InvalidDtype {
+                dtype_error: DtypeError::Misc {
+                    message: "not an array".to_string(),
+                },
+            })?;
+        let ptr = context.insert_instruction(ir::Instruction::GetElementPtr {
+            ptr: arr_ptr.clone(),
+            offset: ir::Operand::Constant(ir::Constant::int(0, ir::Dtype::INT)),
+            dtype: ir::Dtype::pointer(dtype.clone()),
+        })?;
+        match initializer {
+            Initializer::Expression(node) => todo!(),
+            Initializer::List(items) => {
+                for (i, item) in items.iter().enumerate() {
+                    assert!(item.node.designation.is_empty());
+                    let offset = context.insert_instruction(ir::Instruction::BinOp {
+                        op: BinaryOperator::Multiply,
+                        lhs: ir::Operand::constant(ir::Constant::int(i as u128, ir::Dtype::LONG)),
+                        rhs: ir::Operand::constant(ir::Constant::int(4, ir::Dtype::LONG)),
+                        dtype: ir::Dtype::LONG,
+                    })?;
+                    let dst = context.insert_instruction(ir::Instruction::GetElementPtr {
+                        ptr: ptr.clone(),
+                        offset,
+                        dtype: ir::Dtype::pointer(dtype.clone()),
+                    })?;
+                    let value = self.translate_initializer(&item.node.initializer.node, context)?;
+                    let _unused = self.translate_assign_operation(&dst, &value, context)?;
+                }
+            }
+        }
         Ok(())
     }
 
@@ -1614,10 +1664,11 @@ impl IrgenFunc<'_> {
                 let rhs_rvalue = self.translate_expr_rvalue(&binop_expr.rhs.node, context)?;
                 let inner_dtype = lhs_rvalue
                     .dtype()
-                    .get_array_inner()
+                    .get_pointer_inner()
                     .ok_or_else(|| IrgenErrorMessage::InvalidDtype {
                         dtype_error: DtypeError::Misc {
-                            message: "only array can use the index operator".to_string(),
+                            message: "translate expr rvalue should resolve array into pointer"
+                                .to_string(),
                         },
                     })?
                     .clone();
@@ -1635,7 +1686,7 @@ impl IrgenFunc<'_> {
                 let ptr = context.insert_instruction(ir::Instruction::GetElementPtr {
                     ptr: lhs_rvalue.clone(),
                     offset: offset.clone(),
-                    dtype: inner_dtype.clone(),
+                    dtype: ir::Dtype::pointer(inner_dtype.clone()),
                 })?;
 
                 context.insert_instruction(ir::Instruction::Load { ptr })
@@ -2525,7 +2576,7 @@ impl IrgenFunc<'_> {
         context.insert_instruction(ir::Instruction::GetElementPtr {
             ptr: ptr.clone(),
             offset: ir::Operand::constant(ir::Constant::int(0, ir::Dtype::INT)),
-            dtype: dtype.clone(),
+            dtype: ir::Dtype::pointer(dtype.clone()),
         })
     }
 
