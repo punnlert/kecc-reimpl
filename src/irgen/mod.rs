@@ -1310,10 +1310,21 @@ impl IrgenFunc<'_> {
                         self.translate_array_initializer(&value.node, &dtype, &arr_ptr, context)?;
                     }
                 }
-                ir::Dtype::Int { .. }
-                | ir::Dtype::Float { .. }
-                | ir::Dtype::Pointer { .. }
-                | ir::Dtype::Struct { .. } => {
+
+                ir::Dtype::Struct {
+                    ..
+                    // name,
+                    // fields,
+                    // is_const,
+                    // size_align_offsets,
+                } => {
+                    let struct_ptr = self.translate_alloc(&name, &dtype, None, context)?;
+
+                    if let Some(value) = &init_decl.node.initializer {
+                        self.translate_struct_initializer(&value.node, &dtype, &struct_ptr, context)?;
+                    }
+                }
+                ir::Dtype::Int { .. } | ir::Dtype::Float { .. } | ir::Dtype::Pointer { .. } => {
                     let init_value = if let Some(value) = &init_decl.node.initializer {
                         Some(self.translate_initializer(&value.node, context)?)
                     } else {
@@ -1338,6 +1349,57 @@ impl IrgenFunc<'_> {
         Ok(())
     }
 
+    fn translate_struct_initializer(
+        &mut self,
+        initializer: &Initializer,
+        dtype: &ir::Dtype,
+        struct_ptr: &ir::Operand,
+        context: &mut Context,
+    ) -> Result<(), IrgenErrorMessage> {
+        let dtype = self
+            .structs
+            .get(
+                &dtype
+                    .get_struct_name()
+                    .expect("struct should exist")
+                    .clone()
+                    .expect("idk why they wrap it two times"),
+            )
+            .expect("struct should be defined")
+            .as_ref()
+            .expect("we should have struct dtype here");
+
+        let struct_fields = dtype
+            .get_struct_fields()
+            .expect("to exist")
+            .as_ref()
+            .expect("idk why they wrap it twice");
+
+        match initializer {
+            Initializer::Expression(_) => panic!("should be array initializer, right?"),
+            Initializer::List(items) => {
+                let mut curr_offset: u128 = 0;
+                for (item, field) in izip!(items.iter(), struct_fields) {
+                    assert!(item.node.designation.is_empty());
+                    let (field_offset, field_type) = dtype
+                        .get_offset_struct_field(field.name().unwrap().as_str(), self.structs)
+                        .expect("this field should exist, its from this type!");
+                    let dst = context.insert_instruction(ir::Instruction::GetElementPtr {
+                        ptr: struct_ptr.clone(),
+                        offset: ir::Operand::constant(ir::Constant::int(
+                            field_offset as u128,
+                            ir::Dtype::LONG,
+                        )),
+                        dtype: ir::Dtype::pointer(field_type.clone()),
+                    })?;
+                    let value = self.translate_initializer(&item.node.initializer.node, context)?;
+                    let _unused = self.translate_assign_operation(&dst, &value, context)?;
+                }
+            }
+        }
+        Ok(())
+    }
+
     fn translate_array_initializer(
         &mut self,
         initializer: &Initializer,
@@ -1358,7 +1420,7 @@ impl IrgenFunc<'_> {
             dtype: ir::Dtype::pointer(dtype.clone()),
         })?;
         match initializer {
-            Initializer::Expression(node) => todo!(),
+            Initializer::Expression(node) => panic!("should be array initializer, right?"),
             Initializer::List(items) => {
                 for (i, item) in items.iter().enumerate() {
                     assert!(item.node.designation.is_empty());
@@ -2240,6 +2302,10 @@ impl IrgenFunc<'_> {
                     return Ok(ptr);
                 }
 
+                if ptr_inner_dtype.get_struct_name().is_some() {
+                    return Ok(ptr);
+                }
+
                 if let Some(array_inner) = ptr_inner_dtype.get_array_inner() {
                     // [SELF] not sure how to do this
                     // maybe recursion to see if the inner is array. go until not array
@@ -2262,16 +2328,100 @@ impl IrgenFunc<'_> {
             }
             Expression::Member(member_expr) => {
                 // MemberExpression
-                let (base_addr, struct_dtype) = match &member_expr.node.operator.node {
+                match &member_expr.node.operator.node {
                     MemberOperator::Direct => {
                         // this should resolve to be
-                        let val =
+                        let struct_ptr =
                             self.translate_expr_rvalue(&member_expr.node.expression.node, context)?;
-                        (val.clone(), val.dtype())
+
+                        let dtype = struct_ptr
+                            .dtype()
+                            .get_pointer_inner()
+                            .ok_or_else(|| IrgenErrorMessage::InvalidDtype {
+                                dtype_error: DtypeError::Misc {
+                                    message:
+                                        "to use member expr, lhs should be a pointer to struct"
+                                            .to_string(),
+                                },
+                            })?
+                            .clone();
+
+                        let dtype = self
+                            .structs
+                            .get(
+                                dtype
+                                    .get_struct_name()
+                                    .expect("struct should exist")
+                                    .as_ref()
+                                    .expect("idk why they wrap it two times"),
+                            )
+                            .expect("struct should be defined")
+                            .as_ref()
+                            .expect("we should have struct dtype here");
+
+                        let field_name = &member_expr.node.identifier.node.name;
+                        let (offset, dtype) = dtype
+                            .get_offset_struct_field(field_name.as_str(), self.structs)
+                            .ok_or_else(|| IrgenErrorMessage::Misc {
+                                message: format!("the struct doesn't contain {field_name}"),
+                            })?;
+                        let field = context.insert_instruction(ir::Instruction::GetElementPtr {
+                            ptr: struct_ptr,
+                            offset: ir::Operand::constant(ir::Constant::int(
+                                offset as u128,
+                                ir::Dtype::LONG,
+                            )),
+                            dtype: ir::Dtype::pointer(dtype),
+                        })?;
+                        context.insert_instruction(ir::Instruction::Load { ptr: field })
                     }
-                    MemberOperator::Indirect => todo!(),
-                };
-                todo!()
+                    MemberOperator::Indirect => {
+                        let struct_ptr =
+                            self.translate_expr_rvalue(&member_expr.node.expression.node, context)?;
+
+                        let struct_ptr_inner = struct_ptr
+                            .dtype()
+                            .get_pointer_inner()
+                            .ok_or_else(|| {
+                                dbg!(struct_ptr.clone());
+                                IrgenErrorMessage::InvalidDtype {
+                                    dtype_error: DtypeError::Misc {
+                                        message: "it should be a pointer to struct".to_string(),
+                                    },
+                                }
+                            })?
+                            .clone();
+
+                        let struct_dtype = self
+                            .structs
+                            .get(
+                                struct_ptr_inner
+                                    .get_struct_name()
+                                    .expect("struct should exist")
+                                    .as_ref()
+                                    .expect("idk why they wrap it two times"),
+                            )
+                            .expect("struct should be defined")
+                            .as_ref()
+                            .expect("we should have struct dtype here");
+                        let field_name = &member_expr.node.identifier.node.name;
+                        let (offset, dtype) = struct_dtype
+                            .get_offset_struct_field(field_name.as_str(), self.structs)
+                            .ok_or_else(|| IrgenErrorMessage::Misc {
+                                message: format!("the struct doesn't contain {field_name}"),
+                            })?;
+
+                        let field = context.insert_instruction(ir::Instruction::GetElementPtr {
+                            ptr: struct_ptr,
+                            offset: ir::Operand::constant(ir::Constant::int(
+                                offset as u128,
+                                ir::Dtype::LONG,
+                            )),
+                            dtype: ir::Dtype::pointer(dtype),
+                        })?;
+                        context.insert_instruction(ir::Instruction::Load { ptr: field })
+                    }
+                }
             }
             Expression::Call(call_expr) => self.translate_func_call(&call_expr.node, context),
             Expression::SizeOfTy(type_name) => {
@@ -2515,16 +2665,6 @@ impl IrgenFunc<'_> {
                         let rhs_rvalue =
                             self.translate_expr_rvalue(&expr.node.rhs.node, context)?;
 
-                        let inner_dtype = lhs_rvalue
-                            .dtype()
-                            .get_array_inner()
-                            .ok_or_else(|| IrgenErrorMessage::InvalidDtype {
-                                dtype_error: DtypeError::Misc {
-                                    message: "only array can use the index operator".to_string(),
-                                },
-                            })?
-                            .clone();
-
                         // its byte address so
                         // index * 4 bytes (the size of i32)
 
@@ -2538,7 +2678,7 @@ impl IrgenFunc<'_> {
                         context.insert_instruction(ir::Instruction::GetElementPtr {
                             ptr: lhs_rvalue.clone(),
                             offset: offset.clone(),
-                            dtype: inner_dtype.clone(),
+                            dtype: lhs_rvalue.dtype().clone(),
                         })
                     }
                     _ => panic!(
