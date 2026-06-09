@@ -1734,14 +1734,19 @@ impl IrgenFunc<'_> {
                     })?
                     .clone();
 
+                let rhs_rvalue = self.translate_typecast(rhs_rvalue, &ir::Dtype::LONG, context)?;
+                let (size, _) = inner_dtype
+                    .size_align_of(self.structs)
+                    .map_err(|e| IrgenErrorMessage::InvalidDtype { dtype_error: e })?;
+
                 // its byte address so
                 // index * 4 bytes (the size of i32)
 
                 let offset = context.insert_instruction(ir::Instruction::BinOp {
                     op: BinaryOperator::Multiply,
-                    lhs: ir::Operand::constant(ir::Constant::int(4, ir::Dtype::INT)),
-                    rhs: rhs_rvalue,
-                    dtype: ir::Dtype::INT,
+                    lhs: rhs_rvalue,
+                    rhs: ir::Operand::constant(ir::Constant::int(size as u128, ir::Dtype::LONG)),
+                    dtype: ir::Dtype::LONG,
                 })?;
 
                 let ptr = context.insert_instruction(ir::Instruction::GetElementPtr {
@@ -1750,7 +1755,16 @@ impl IrgenFunc<'_> {
                     dtype: ir::Dtype::pointer(inner_dtype.clone()),
                 })?;
 
-                context.insert_instruction(ir::Instruction::Load { ptr })
+                match &inner_dtype {
+                    ir::Dtype::Array { inner, .. } => {
+                        context.insert_instruction(ir::Instruction::GetElementPtr {
+                            ptr,
+                            offset: ir::Operand::constant(ir::Constant::int(0, ir::Dtype::INT)),
+                            dtype: ir::Dtype::pointer(*inner.clone()),
+                        })
+                    }
+                    _ => context.insert_instruction(ir::Instruction::Load { ptr }),
+                }
             }
             BinaryOperator::Multiply
             | BinaryOperator::Divide
@@ -2105,8 +2119,12 @@ impl IrgenFunc<'_> {
                 }
             }
             (_, _) => {
-                dbg!(lhs, rhs);
-                panic!("only arithmatic type for arithmatic conversion")
+                // panic!("only arithmatic type for arithmatic conversion");
+                return Err(IrgenErrorMessage::InvalidDtype {
+                    dtype_error: DtypeError::Misc {
+                        message: "only arithmatic type for arithmatic conversion".to_string(),
+                    },
+                });
             }
         }
         Err(IrgenErrorMessage::Misc {
@@ -2382,13 +2400,10 @@ impl IrgenFunc<'_> {
                         let struct_ptr_inner = struct_ptr
                             .dtype()
                             .get_pointer_inner()
-                            .ok_or_else(|| {
-                                dbg!(struct_ptr.clone());
-                                IrgenErrorMessage::InvalidDtype {
-                                    dtype_error: DtypeError::Misc {
-                                        message: "it should be a pointer to struct".to_string(),
-                                    },
-                                }
+                            .ok_or_else(|| IrgenErrorMessage::InvalidDtype {
+                                dtype_error: DtypeError::Misc {
+                                    message: "it should be a pointer to struct".to_string(),
+                                },
                             })?
                             .clone();
 
@@ -2665,14 +2680,36 @@ impl IrgenFunc<'_> {
                         let rhs_rvalue =
                             self.translate_expr_rvalue(&expr.node.rhs.node, context)?;
 
+                        let rhs_rvalue =
+                            self.translate_typecast(rhs_rvalue, &ir::Dtype::LONG, context)?;
+
+                        let inner_dtype = lhs_rvalue
+                            .dtype()
+                            .get_pointer_inner()
+                            .ok_or_else(|| IrgenErrorMessage::InvalidDtype {
+                                dtype_error: DtypeError::Misc {
+                                    message:
+                                        "translate expr rvalue should resolve array into pointer"
+                                            .to_string(),
+                                },
+                            })?
+                            .clone();
+
+                        let (size, _) = inner_dtype
+                            .size_align_of(self.structs)
+                            .map_err(|e| IrgenErrorMessage::InvalidDtype { dtype_error: e })?;
+
                         // its byte address so
                         // index * 4 bytes (the size of i32)
 
                         let offset = context.insert_instruction(ir::Instruction::BinOp {
                             op: BinaryOperator::Multiply,
-                            lhs: ir::Operand::constant(ir::Constant::int(4, ir::Dtype::INT)),
-                            rhs: rhs_rvalue,
-                            dtype: ir::Dtype::INT,
+                            lhs: rhs_rvalue,
+                            rhs: ir::Operand::constant(ir::Constant::int(
+                                size as u128,
+                                ir::Dtype::LONG,
+                            )),
+                            dtype: ir::Dtype::LONG,
                         })?;
 
                         context.insert_instruction(ir::Instruction::GetElementPtr {
