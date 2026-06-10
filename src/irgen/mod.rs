@@ -1375,15 +1375,22 @@ impl IrgenFunc<'_> {
             .as_ref()
             .expect("idk why they wrap it twice");
 
+        let size_align_offsets = dtype
+            .get_struct_size_align_offsets()
+            .expect("struct should have these")
+            .as_ref()
+            .unwrap();
+
         match initializer {
             Initializer::Expression(_) => panic!("should be array initializer, right?"),
             Initializer::List(items) => {
                 let mut curr_offset: u128 = 0;
-                for (item, field) in izip!(items.iter(), struct_fields) {
+                for (i, (item, field)) in izip!(items.iter(), struct_fields).enumerate() {
                     assert!(item.node.designation.is_empty());
-                    let (field_offset, field_type) = dtype
-                        .get_offset_struct_field(field.name().unwrap().as_str(), self.structs)
-                        .expect("this field should exist, its from this type!");
+
+                    let field_offset = size_align_offsets.2[i];
+                    let field_type = field.clone().into_inner();
+
                     let dst = context.insert_instruction(ir::Instruction::GetElementPtr {
                         ptr: struct_ptr.clone(),
                         offset: ir::Operand::constant(ir::Constant::int(
