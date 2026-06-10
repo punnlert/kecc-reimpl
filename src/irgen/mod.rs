@@ -2372,9 +2372,12 @@ impl IrgenFunc<'_> {
                     return Ok(ptr);
                 }
 
-                if ptr_inner_dtype.get_struct_name().is_some() {
-                    return Ok(ptr);
-                }
+                // EDIT: If we get a struct we shouldn't just returning pointers right? just load
+                // it? if we want pointer then use lvalue
+                //
+                // if ptr_inner_dtype.get_struct_name().is_some() {
+                //     return Ok(ptr);
+                // }
 
                 if let Some(array_inner) = ptr_inner_dtype.get_array_inner() {
                     // [SELF] not sure how to do this
@@ -2402,7 +2405,7 @@ impl IrgenFunc<'_> {
                     MemberOperator::Direct => {
                         // this should resolve to be
                         let struct_ptr =
-                            self.translate_expr_rvalue(&member_expr.node.expression.node, context)?;
+                            self.translate_expr_lvalue(&member_expr.node.expression.node, context)?;
 
                         let dtype = struct_ptr
                             .dtype()
@@ -2441,8 +2444,26 @@ impl IrgenFunc<'_> {
                                 offset as u128,
                                 ir::Dtype::LONG,
                             )),
-                            dtype: ir::Dtype::pointer(dtype),
+                            dtype: ir::Dtype::pointer(dtype.clone()),
                         })?;
+
+                        // when ptr points to function or an array, we don't have to load the value and
+                        // just return the pointer
+                        // borrowed this from translate id
+                        if dtype.get_function_inner().is_some() {
+                            return Ok(field);
+                        }
+
+                        if dtype.get_struct_name().is_some() {
+                            return Ok(field);
+                        }
+
+                        if let Some(array_inner) = dtype.get_array_inner() {
+                            // [SELF] not sure how to do this
+                            // maybe recursion to see if the inner is array. go until not array
+                            // use the pointer at the last. but is it ok?
+                            return self.translate_array_pointer(&field, array_inner, context);
+                        }
                         context.insert_instruction(ir::Instruction::Load { ptr: field })
                     }
                     MemberOperator::Indirect => {
