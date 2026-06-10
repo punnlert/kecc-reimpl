@@ -2532,6 +2532,7 @@ impl IrgenFunc<'_> {
             Expression::Member(member_expr) => todo!(),
             Expression::Call(call_expr) => {
                 let callee = call_expr.node.callee.node.clone();
+                let callee_dtype = self.dtype_of_expr(&callee);
 
                 todo!()
             }
@@ -2551,11 +2552,163 @@ impl IrgenFunc<'_> {
                     .map_err(|e| IrgenErrorMessage::InvalidDtype { dtype_error: e })?;
                 Ok(size_of as u128)
             }
-            Expression::BinaryOperator(node) => todo!(),
+            Expression::BinaryOperator(binop_expr) => {
+                self.calculate_sizeof_binop_expr(&binop_expr.node)
+            }
             Expression::Conditional(node) => todo!(),
             Expression::Comma(nodes) => todo!(),
             _ => panic!("not supported"),
         }
+    }
+
+    fn calculate_sizeof_binop_expr(
+        &mut self,
+        binop_expr: &BinaryOperatorExpression,
+    ) -> Result<u128, IrgenErrorMessage> {
+        match &binop_expr.operator.node {
+            BinaryOperator::Index => {
+                let lhs_dtype = self.dtype_of_expr(&binop_expr.lhs.node)?;
+                let (size, _) = lhs_dtype
+                    .size_align_of(self.structs)
+                    .map_err(|e| IrgenErrorMessage::InvalidDtype { dtype_error: e })?;
+                Ok(size as u128)
+            }
+            BinaryOperator::Multiply
+            | BinaryOperator::Divide
+            | BinaryOperator::Modulo
+            | BinaryOperator::Plus
+            | BinaryOperator::Minus => {
+                let lhs_dtype = self.dtype_of_expr(&binop_expr.lhs.node)?;
+                let rhs_dtype = self.dtype_of_expr(&binop_expr.rhs.node)?;
+
+                let merge_dtype = self.resolve_dtype_arithmatic_conversion(lhs_dtype, rhs_dtype)?;
+
+                let (size, _) = merge_dtype
+                    .size_align_of(self.structs)
+                    .map_err(|e| IrgenErrorMessage::InvalidDtype { dtype_error: e })?;
+                Ok(size as u128)
+            }
+            BinaryOperator::LogicalAnd
+            | BinaryOperator::LogicalOr
+            | BinaryOperator::Less
+            | BinaryOperator::Greater
+            | BinaryOperator::LessOrEqual
+            | BinaryOperator::GreaterOrEqual
+            | BinaryOperator::Equals
+            | BinaryOperator::NotEquals => Ok(1),
+            BinaryOperator::BitwiseAnd | BinaryOperator::BitwiseXor | BinaryOperator::BitwiseOr => {
+                let lhs_dtype = self.dtype_of_expr(&binop_expr.lhs.node)?;
+                let rhs_dtype = self.dtype_of_expr(&binop_expr.rhs.node)?;
+
+                let merge_dtype = self.resolve_dtype_arithmatic_conversion(lhs_dtype, rhs_dtype)?;
+
+                let (size, _) = merge_dtype
+                    .size_align_of(self.structs)
+                    .map_err(|e| IrgenErrorMessage::InvalidDtype { dtype_error: e })?;
+                Ok(size as u128)
+            }
+            BinaryOperator::ShiftLeft | BinaryOperator::ShiftRight => {
+                let size = self.calculate_sizeof_expr(&binop_expr.lhs.node)?;
+                Ok(size.max(ir::Dtype::SIZE_OF_INT as u128))
+            }
+            BinaryOperator::Assign
+            | BinaryOperator::AssignMultiply
+            | BinaryOperator::AssignDivide
+            | BinaryOperator::AssignModulo
+            | BinaryOperator::AssignPlus
+            | BinaryOperator::AssignMinus
+            | BinaryOperator::AssignShiftLeft
+            | BinaryOperator::AssignShiftRight
+            | BinaryOperator::AssignBitwiseAnd
+            | BinaryOperator::AssignBitwiseXor
+            | BinaryOperator::AssignBitwiseOr => {
+                let dtype = self.dtype_of_expr(&binop_expr.lhs.node)?;
+
+                let (size, _) = dtype
+                    .size_align_of(self.structs)
+                    .map_err(|e| IrgenErrorMessage::InvalidDtype { dtype_error: e })?;
+                Ok(size as u128)
+            }
+        }
+    }
+
+    fn resolve_dtype_arithmatic_conversion(
+        &mut self,
+        lhs: ir::Dtype,
+        rhs: ir::Dtype,
+    ) -> Result<ir::Dtype, IrgenErrorMessage> {
+        match (lhs.clone(), rhs.clone()) {
+            (ir::Dtype::DOUBLE, _) => return Ok(ir::Dtype::DOUBLE),
+            (_, ir::Dtype::DOUBLE) => return Ok(ir::Dtype::DOUBLE),
+            (ir::Dtype::FLOAT, _) => return Ok(ir::Dtype::FLOAT),
+            (_, ir::Dtype::FLOAT) => return Ok(ir::Dtype::FLOAT),
+            (ir::Dtype::Int { .. }, ir::Dtype::Int { .. }) => {
+                let width_of_int = ir::Dtype::SIZE_OF_INT * ir::Dtype::BITS_OF_BYTE;
+                let lhs = if lhs.get_int_width().unwrap() < width_of_int {
+                    ir::Dtype::INT
+                } else {
+                    lhs
+                };
+                let rhs = if rhs.get_int_width().unwrap() < width_of_int {
+                    ir::Dtype::INT
+                } else {
+                    rhs
+                };
+
+                let lhs_width = lhs.get_int_width();
+                let rhs_width = rhs.get_int_width();
+
+                let lhs_signed = lhs.is_int_signed();
+                let rhs_signed = rhs.is_int_signed();
+
+                if (lhs == rhs) {
+                    return Ok(lhs);
+                }
+
+                // get the biggest width
+                let convert_width = lhs_width.max(rhs_width).unwrap();
+
+                // if both has the same signed
+                if (lhs_signed == rhs_signed) {
+                    let is_signed = lhs_signed;
+                    let dtype = ir::Dtype::Int {
+                        width: convert_width,
+                        is_signed,
+                        is_const: false,
+                    };
+                    return Ok(dtype);
+                }
+
+                match (lhs_signed, rhs_signed) {
+                    (true, false) => {
+                        if (lhs_width <= rhs_width) {
+                            return Ok(rhs);
+                        } else {
+                            return Ok(lhs);
+                        }
+                    }
+                    (false, true) => {
+                        if (lhs_width >= rhs_width) {
+                            return Ok(lhs);
+                        } else {
+                            return Ok(rhs);
+                        }
+                    }
+                    (_, _) => panic!("not possible"),
+                }
+            }
+            (_, _) => {
+                // panic!("only arithmatic type for arithmatic conversion");
+                return Err(IrgenErrorMessage::InvalidDtype {
+                    dtype_error: DtypeError::Misc {
+                        message: "only arithmatic type for arithmatic conversion".to_string(),
+                    },
+                });
+            }
+        }
+        Err(IrgenErrorMessage::Misc {
+            message: "should have resolved everything by now".to_string(),
+        })
     }
 
     fn calculate_sizeof_unary_expr(
@@ -2586,10 +2739,7 @@ impl IrgenFunc<'_> {
             // anything narrower than `int` becomes `int`
             UnaryOperator::Plus | UnaryOperator::Minus | UnaryOperator::Complement => {
                 let size = self.calculate_sizeof_expr(operand)?;
-                let (int_size, _) = ir::Dtype::INT
-                    .size_align_of(self.structs)
-                    .map_err(|e| IrgenErrorMessage::InvalidDtype { dtype_error: e })?;
-                Ok(size.max(int_size as u128))
+                Ok(size.max((ir::Dtype::SIZE_OF_INT * ir::Dtype::BITS_OF_BYTE) as u128))
             }
             // `!x` always yields `int`
             UnaryOperator::Negate => {
