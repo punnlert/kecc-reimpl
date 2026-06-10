@@ -1442,8 +1442,30 @@ impl IrgenFunc<'_> {
                         offset,
                         dtype: ir::Dtype::pointer(dtype.clone()),
                     })?;
-                    let value = self.translate_initializer(&item.node.initializer.node, context)?;
-                    let _unused = self.translate_assign_operation(&dst, &value, context)?;
+                    match dtype {
+                        ir::Dtype::Unit { .. } => todo!(),
+                        ir::Dtype::Int { .. }
+                        | ir::Dtype::Float { .. }
+                        | ir::Dtype::Pointer { .. } => {
+                            let value =
+                                self.translate_initializer(&item.node.initializer.node, context)?;
+                            let _unused = self.translate_assign_operation(&dst, &value, context)?;
+                        }
+                        ir::Dtype::Array { .. } => self.translate_array_initializer(
+                            &item.node.initializer.node,
+                            dtype,
+                            &dst,
+                            context,
+                        )?,
+                        ir::Dtype::Struct { .. } => self.translate_struct_initializer(
+                            &item.node.initializer.node,
+                            dtype,
+                            &dst,
+                            context,
+                        )?,
+                        ir::Dtype::Function { .. } => todo!(),
+                        ir::Dtype::Typedef { .. } => todo!(),
+                    }
                 }
             }
         }
