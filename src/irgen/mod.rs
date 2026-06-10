@@ -1399,8 +1399,31 @@ impl IrgenFunc<'_> {
                         )),
                         dtype: ir::Dtype::pointer(field_type.clone()),
                     })?;
-                    let value = self.translate_initializer(&item.node.initializer.node, context)?;
-                    let _unused = self.translate_assign_operation(&dst, &value, context)?;
+
+                    match field_type {
+                        ir::Dtype::Unit { .. } => todo!(),
+                        ir::Dtype::Int { .. }
+                        | ir::Dtype::Float { .. }
+                        | ir::Dtype::Pointer { .. } => {
+                            let value =
+                                self.translate_initializer(&item.node.initializer.node, context)?;
+                            let _unused = self.translate_assign_operation(&dst, &value, context)?;
+                        }
+                        ir::Dtype::Array { .. } => self.translate_array_initializer(
+                            &item.node.initializer.node,
+                            &field_type,
+                            &dst,
+                            context,
+                        )?,
+                        ir::Dtype::Struct { .. } => self.translate_struct_initializer(
+                            &item.node.initializer.node,
+                            &field_type,
+                            &dst,
+                            context,
+                        )?,
+                        ir::Dtype::Function { .. } => todo!(),
+                        ir::Dtype::Typedef { .. } => todo!(),
+                    }
                 }
             }
         }
