@@ -2245,6 +2245,101 @@ impl IrgenFunc<'_> {
         }
     }
 
+    fn translate_pointer_arithmatic_unary_expression(
+        &mut self,
+        operator: &UnaryOperator,
+        ptr_operand: &ir::Operand,
+        ptr_expr: &Expression,
+        context: &mut Context,
+    ) -> Result<ir::Operand, IrgenErrorMessage> {
+        let dtype = ptr_operand.dtype();
+        let ptr = self.translate_expr_lvalue(ptr_expr, context)?;
+
+        assert!(dtype.get_pointer_inner().is_some());
+
+        match operator {
+            UnaryOperator::PostIncrement => {
+                let offset = context.insert_instruction(ir::Instruction::BinOp {
+                    op: BinaryOperator::Multiply,
+                    lhs: ir::Operand::constant(ir::Constant::int(1, ir::Dtype::LONG)),
+                    rhs: ir::Operand::Constant(ir::Constant::int(4, ir::Dtype::LONG)),
+                    dtype: ir::Dtype::LONG,
+                })?;
+
+                let inc_operand = context.insert_instruction(ir::Instruction::GetElementPtr {
+                    ptr: ptr_operand.clone(),
+                    offset,
+                    dtype,
+                })?;
+
+                // put the incremented value back into the id
+                let _unused = self.translate_assign_operation(&ptr, &inc_operand, context)?;
+
+                // didnt return incremented value just return the previous value
+                Ok(ptr_operand.clone())
+            }
+            UnaryOperator::PostDecrement => {
+                let offset = context.insert_instruction(ir::Instruction::BinOp {
+                    op: BinaryOperator::Multiply,
+                    lhs: ir::Operand::constant(ir::Constant::int(u128::MAX, ir::Dtype::LONG)),
+                    rhs: ir::Operand::Constant(ir::Constant::int(4, ir::Dtype::LONG)),
+                    dtype: ir::Dtype::LONG,
+                })?;
+
+                let inc_operand = context.insert_instruction(ir::Instruction::GetElementPtr {
+                    ptr: ptr_operand.clone(),
+                    offset,
+                    dtype,
+                })?;
+
+                // put the incremented value back into the id
+                let _unused = self.translate_assign_operation(&ptr, &inc_operand, context)?;
+
+                // didnt return incremented value just return the previous value
+                Ok(ptr_operand.clone())
+            }
+            UnaryOperator::PreIncrement => {
+                let offset = context.insert_instruction(ir::Instruction::BinOp {
+                    op: BinaryOperator::Multiply,
+                    lhs: ir::Operand::constant(ir::Constant::int(1, ir::Dtype::LONG)),
+                    rhs: ir::Operand::Constant(ir::Constant::int(4, ir::Dtype::LONG)),
+                    dtype: ir::Dtype::LONG,
+                })?;
+
+                let inc_operand = context.insert_instruction(ir::Instruction::GetElementPtr {
+                    ptr: ptr_operand.clone(),
+                    offset,
+                    dtype,
+                })?;
+
+                // put the incremented value back into the id
+                let _unused = self.translate_assign_operation(&ptr, &inc_operand, context)?;
+
+                Ok(inc_operand.clone())
+            }
+            UnaryOperator::PreDecrement => {
+                let offset = context.insert_instruction(ir::Instruction::BinOp {
+                    op: BinaryOperator::Multiply,
+                    lhs: ir::Operand::constant(ir::Constant::int(u128::MAX, ir::Dtype::LONG)),
+                    rhs: ir::Operand::Constant(ir::Constant::int(4, ir::Dtype::LONG)),
+                    dtype: ir::Dtype::LONG,
+                })?;
+
+                let inc_operand = context.insert_instruction(ir::Instruction::GetElementPtr {
+                    ptr: ptr_operand.clone(),
+                    offset,
+                    dtype,
+                })?;
+
+                // put the incremented value back into the id
+                let _unused = self.translate_assign_operation(&ptr, &inc_operand, context)?;
+
+                Ok(inc_operand.clone())
+            }
+            _ => panic!("ptr can't do this.. yet?"),
+        }
+    }
+
     fn translate_arithmatic_unary_expression(
         &mut self,
         operator: &UnaryOperator,
@@ -2253,10 +2348,16 @@ impl IrgenFunc<'_> {
     ) -> Result<ir::Operand, IrgenErrorMessage> {
         let operand = self.translate_expr_rvalue(expr, context)?;
         let op = operator.clone();
+
+        if let Some(ptr_inner) = operand.dtype().get_pointer_inner() {
+            return self
+                .translate_pointer_arithmatic_unary_expression(operator, &operand, expr, context);
+        }
+
         match operator {
             UnaryOperator::Plus | UnaryOperator::Minus => {
-                let dtype = operand.dtype();
                 let operand = self.integer_promotions(operand, context)?;
+                let dtype = operand.dtype();
                 context.insert_instruction(ir::Instruction::UnaryOp { op, operand, dtype })
             }
 
