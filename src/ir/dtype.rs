@@ -529,7 +529,7 @@ impl Dtype {
     /// TODO(document)
     pub const SIZE_OF_SHORT: usize = 2;
 
-    /// TODO(document)
+    /// size of INT in bytes
     pub const SIZE_OF_INT: usize = 4;
 
     /// TODO(document)
