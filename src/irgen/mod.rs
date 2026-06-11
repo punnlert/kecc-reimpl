@@ -2732,9 +2732,19 @@ impl IrgenFunc<'_> {
             Expression::Member(member_expr) => todo!(),
             Expression::Call(call_expr) => {
                 let callee = call_expr.node.callee.node.clone();
-                let callee_dtype = self.dtype_of_expr(&callee);
+                let callee_dtype = self.dtype_of_expr(&callee)?;
 
-                todo!()
+                let (return_dtype, param_dtype) =
+                    callee_dtype.get_function_inner().ok_or_else(|| {
+                        IrgenErrorMessage::InvalidDtype {
+                            dtype_error: DtypeError::Misc {
+                                message: "this should be a function dtype".to_string(),
+                            },
+                        }
+                    })?;
+                let (size_of, _) = return_dtype.size_align_of(self.structs).unwrap();
+
+                Ok(size_of.try_into().unwrap())
             }
             Expression::SizeOfTy(_) => Ok(size_of_int as u128),
             Expression::SizeOfVal(_) => Ok(size_of_int as u128),
