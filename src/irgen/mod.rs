@@ -1382,7 +1382,11 @@ impl IrgenFunc<'_> {
             .unwrap();
 
         match initializer {
-            Initializer::Expression(_) => panic!("should be array initializer, right?"),
+            Initializer::Expression(expr) => {
+                let value = self.translate_expr_rvalue(&expr.node, context)?;
+
+                let _unused = self.translate_assign_operation(struct_ptr, &value, context)?;
+            }
             Initializer::List(items) => {
                 let mut curr_offset: u128 = 0;
                 for (i, (item, field)) in izip!(items.iter(), struct_fields).enumerate() {
@@ -1401,7 +1405,9 @@ impl IrgenFunc<'_> {
                     })?;
 
                     match field_type {
-                        ir::Dtype::Unit { .. } => todo!(),
+                        ir::Dtype::Unit { .. } => {
+                            panic!("this panic is in translate_struct_initializer")
+                        }
                         ir::Dtype::Int { .. }
                         | ir::Dtype::Float { .. }
                         | ir::Dtype::Pointer { .. } => {
@@ -1421,8 +1427,12 @@ impl IrgenFunc<'_> {
                             &dst,
                             context,
                         )?,
-                        ir::Dtype::Function { .. } => todo!(),
-                        ir::Dtype::Typedef { .. } => todo!(),
+                        ir::Dtype::Function { .. } => {
+                            panic!("this panic is in translate_struct_initializer")
+                        }
+                        ir::Dtype::Typedef { .. } => {
+                            panic!("this panic is in translate_struct_initializer")
+                        }
                     }
                 }
             }
@@ -1450,7 +1460,13 @@ impl IrgenFunc<'_> {
             dtype: ir::Dtype::pointer(dtype.clone()),
         })?;
         match initializer {
-            Initializer::Expression(node) => panic!("should be array initializer, right?"),
+            Initializer::Expression(expr) => {
+                let value = self.translate_expr_rvalue(&expr.node, context)?;
+
+                let value = self.translate_typecast(value, dtype, context)?;
+
+                let _unused = self.translate_assign_operation(arr_ptr, &value, context)?;
+            }
             Initializer::List(items) => {
                 for (i, item) in items.iter().enumerate() {
                     assert!(item.node.designation.is_empty());
@@ -1466,7 +1482,9 @@ impl IrgenFunc<'_> {
                         dtype: ir::Dtype::pointer(dtype.clone()),
                     })?;
                     match dtype {
-                        ir::Dtype::Unit { .. } => todo!(),
+                        ir::Dtype::Unit { .. } => {
+                            panic!("this panic is in translate_array_initializer")
+                        }
                         ir::Dtype::Int { .. }
                         | ir::Dtype::Float { .. }
                         | ir::Dtype::Pointer { .. } => {
@@ -1486,8 +1504,12 @@ impl IrgenFunc<'_> {
                             &dst,
                             context,
                         )?,
-                        ir::Dtype::Function { .. } => todo!(),
-                        ir::Dtype::Typedef { .. } => todo!(),
+                        ir::Dtype::Function { .. } => {
+                            panic!("this panic is in translate_array_initializer")
+                        }
+                        ir::Dtype::Typedef { .. } => {
+                            panic!("this panic is in translate_array_initializer")
+                        }
                     }
                 }
             }
@@ -2949,7 +2971,127 @@ impl IrgenFunc<'_> {
             Expression::StringLiteral(_) => {
                 panic!("can't use string literal on the left hand side of the assignment")
             }
-            Expression::Member(node) => todo!(),
+            Expression::Member(member_expr) => {
+                // MemberExpression
+                match &member_expr.node.operator.node {
+                    MemberOperator::Direct => {
+                        // this should resolve to be
+                        let struct_ptr =
+                            self.translate_expr_lvalue(&member_expr.node.expression.node, context)?;
+
+                        let dtype = struct_ptr
+                            .dtype()
+                            .get_pointer_inner()
+                            .ok_or_else(|| IrgenErrorMessage::InvalidDtype {
+                                dtype_error: DtypeError::Misc {
+                                    message:
+                                        "to use member expr, lhs should be a pointer to struct"
+                                            .to_string(),
+                                },
+                            })?
+                            .clone();
+
+                        let dtype = self
+                            .structs
+                            .get(
+                                dtype
+                                    .get_struct_name()
+                                    .expect("struct should exist")
+                                    .as_ref()
+                                    .expect("idk why they wrap it two times"),
+                            )
+                            .expect("struct should be defined")
+                            .as_ref()
+                            .expect("we should have struct dtype here");
+
+                        let field_name = &member_expr.node.identifier.node.name;
+                        let (offset, dtype) = dtype
+                            .get_offset_struct_field(field_name.as_str(), self.structs)
+                            .ok_or_else(|| IrgenErrorMessage::Misc {
+                                message: format!("the struct doesn't contain {field_name}"),
+                            })?;
+                        let field = context.insert_instruction(ir::Instruction::GetElementPtr {
+                            ptr: struct_ptr,
+                            offset: ir::Operand::constant(ir::Constant::int(
+                                offset as u128,
+                                ir::Dtype::LONG,
+                            )),
+                            dtype: ir::Dtype::pointer(dtype.clone()),
+                        })?;
+
+                        // when ptr points to function or an array, we don't have to load the value and
+                        // just return the pointer
+                        if dtype.get_function_inner().is_some() {
+                            return Ok(field);
+                        }
+
+                        if let Some(array_inner) = dtype.get_array_inner() {
+                            // [SELF] not sure how to do this
+                            // maybe recursion to see if the inner is array. go until not array
+                            // use the pointer at the last. but is it ok?
+                            return self.translate_array_pointer(&field, array_inner, context);
+                        }
+                        Ok(field)
+                    }
+                    MemberOperator::Indirect => {
+                        let struct_ptr =
+                            self.translate_expr_rvalue(&member_expr.node.expression.node, context)?;
+
+                        let struct_ptr_inner = struct_ptr
+                            .dtype()
+                            .get_pointer_inner()
+                            .ok_or_else(|| IrgenErrorMessage::InvalidDtype {
+                                dtype_error: DtypeError::Misc {
+                                    message: "it should be a pointer to struct".to_string(),
+                                },
+                            })?
+                            .clone();
+
+                        let struct_dtype = self
+                            .structs
+                            .get(
+                                struct_ptr_inner
+                                    .get_struct_name()
+                                    .expect("struct should exist")
+                                    .as_ref()
+                                    .expect("idk why they wrap it two times"),
+                            )
+                            .expect("struct should be defined")
+                            .as_ref()
+                            .expect("we should have struct dtype here");
+                        let field_name = &member_expr.node.identifier.node.name;
+                        let (offset, dtype) = struct_dtype
+                            .get_offset_struct_field(field_name.as_str(), self.structs)
+                            .ok_or_else(|| IrgenErrorMessage::Misc {
+                                message: format!("the struct doesn't contain {field_name}"),
+                            })?;
+
+                        let field = context.insert_instruction(ir::Instruction::GetElementPtr {
+                            ptr: struct_ptr,
+                            offset: ir::Operand::constant(ir::Constant::int(
+                                offset as u128,
+                                ir::Dtype::LONG,
+                            )),
+                            dtype: ir::Dtype::pointer(dtype.clone()),
+                        })?;
+
+                        // when ptr points to function or an array, we don't have to load the value and
+                        // just return the pointer
+                        if dtype.get_function_inner().is_some() {
+                            return Ok(field);
+                        }
+
+                        if let Some(array_inner) = dtype.get_array_inner() {
+                            // [SELF] not sure how to do this
+                            // maybe recursion to see if the inner is array. go until not array
+                            // use the pointer at the last. but is it ok?
+                            return self.translate_array_pointer(&field, array_inner, context);
+                        }
+
+                        Ok(field)
+                    }
+                }
+            }
             Expression::Call(_)
             | Expression::SizeOfTy(_)
             | Expression::SizeOfVal(_)
