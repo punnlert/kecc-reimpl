@@ -2727,7 +2727,7 @@ impl IrgenFunc<'_> {
                 let (size_of, _) = dtype
                     .size_align_of(self.structs)
                     .map_err(|e| IrgenErrorMessage::InvalidDtype { dtype_error: e })?;
-                Ok(size_of as u128)
+                Ok(size_of.try_into().unwrap())
             }
             Expression::Member(member_expr) => todo!(),
             Expression::Call(call_expr) => {
