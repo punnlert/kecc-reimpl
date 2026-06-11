@@ -2527,8 +2527,23 @@ impl IrgenFunc<'_> {
                 match &member_expr.node.operator.node {
                     MemberOperator::Direct => {
                         // this should resolve to be
-                        let struct_ptr =
-                            self.translate_expr_lvalue(&member_expr.node.expression.node, context)?;
+                        let struct_ptr = match &member_expr.node.expression.node {
+                            Expression::Call(call_expr) => {
+                                let value = self.translate_func_call(&call_expr.node, context)?;
+                                let tid = self.alloc_tempid();
+                                let alloc = self.translate_alloc(
+                                    &tid,
+                                    &value.dtype(),
+                                    Some(value.clone()),
+                                    context,
+                                )?;
+                                self.lookup_symbol_table_entry(&tid)?
+                            }
+                            _ => self.translate_expr_lvalue(
+                                &member_expr.node.expression.node,
+                                context,
+                            )?,
+                        };
 
                         let dtype = struct_ptr
                             .dtype()
